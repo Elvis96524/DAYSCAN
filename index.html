@@ -56,6 +56,7 @@
     </div>
 
     <button id="btnKey" class="btn">🔑 API Key</button>
+    <button id="btnSync" class="btn">☁ 同步</button>
 
     <!-- 测试 / 真实 切换 -->
     <div class="flex items-center gap-2">
@@ -73,6 +74,27 @@
     <input id="keyInput" type="password" placeholder="粘贴你的 FMP API Key" class="flex-1 min-w-[220px]" style="width:auto">
     <button id="keySave" class="btn btn-primary">保存</button>
     <button id="keyClear" class="btn">清除</button>
+  </div>
+</div>
+
+<!-- 跨设备同步面板 -->
+<div id="syncBar" class="hidden px-4 py-3 border-b text-xs" style="border-color:var(--line);background:#0e121a">
+  <div class="max-w-3xl space-y-2">
+    <div class="mute leading-relaxed">通过你自己 GitHub 账号下的<b class="text-white">私密 Gist</b>在电脑和手机间同步：API 额度计数（按设备累加）、筛选条件、最近一次扫描缓存。只在你点击时才同步，不会自动联网。令牌只保存在本机，不会被同步。</div>
+    <div class="flex flex-wrap items-center gap-2">
+      <input id="ghToken" type="password" placeholder="GitHub 令牌（classic，仅勾选 gist 权限）" class="flex-1 min-w-[220px]" style="width:auto">
+      <input id="ghGist" type="text" placeholder="Gist ID（留空自动创建/查找）" class="min-w-[180px]" style="width:200px">
+      <button id="syncSaveCfg" class="btn">保存设置</button>
+    </div>
+    <label class="flex items-center gap-2 mute"><input id="syncWithKey" type="checkbox"> 同时同步 FMP API Key（不推荐：Gist 内容是明文，知道链接的人都能看到）</label>
+    <div class="flex flex-wrap items-center gap-2">
+      <button id="syncNow" class="btn btn-primary">⇅ 立即同步（合并后上传）</button>
+      <button id="syncExport" class="btn">⬇ 导出 JSON</button>
+      <button id="syncImport" class="btn">⬆ 导入 JSON</button>
+      <button id="syncReset" class="btn">断开</button>
+      <input id="syncFile" type="file" accept="application/json,.json" class="hidden">
+    </div>
+    <div id="syncStatus" class="mute"></div>
   </div>
 </div>
 
@@ -202,7 +224,14 @@ const state = {
 };
 
 /* ---------------------------- API 额度计数 ---------------------------- */
-function quota(){ const q = lsGet(LS.quota, {day:utcDay(), used:0}); if(q.day!==utcDay()) return {day:utcDay(), used:0}; return q; }
+const DEVICE_ID = (()=>{ let d=lsGet('dt_device'); if(!d){ d=Math.random().toString(36).slice(2,8); lsSet('dt_device',d); } return d; })();
+function quota(){
+  const q = lsGet(LS.quota, null);
+  if(!q || q.day!==utcDay()) return {day:utcDay(), used:0, dev:{}};
+  if(!q.dev) q.dev = {[DEVICE_ID]: q.used||0};                 // 兼容旧数据
+  q.used = Object.values(q.dev).reduce((a,b)=>a+b,0);          // 总用量 = 各设备之和
+  return q;
+}
 function renderQuota(){
   const q = quota(), left = Math.max(0, DAILY_LIMIT - q.used), pct = Math.min(100, q.used/DAILY_LIMIT*100);
   $('quotaText').textContent = `${q.used} / ${DAILY_LIMIT}`;
@@ -210,7 +239,7 @@ function renderQuota(){
   const bar = $('quotaBar'); bar.style.width = pct+'%';
   bar.style.background = pct>85 ? 'var(--down)' : pct>60 ? '#f5a524' : 'var(--up)';
 }
-function addQuota(n=1){ const q = quota(); q.used += n; lsSet(LS.quota, q); renderQuota(); }
+function addQuota(n=1){ const q = quota(); q.dev[DEVICE_ID]=(q.dev[DEVICE_ID]||0)+n; q.used+=n; lsSet(LS.quota, q); renderQuota(); }
 
 /* ---------------------------- FMP 请求封装 ---------------------------- */
 async function fmp(path, params={}){
@@ -526,13 +555,116 @@ $('btnReloadCandle').onclick = () => {
   if(state.live && !confirm('重新加载将消耗 1 次 API 请求，继续？')) return;
   selectStock(state.selected.symbol, true);
 };
-['fChg','fRvol','fMin','fMax'].forEach(id => $(id).addEventListener('input', renderScan));
+['fChg','fRvol','fMin','fMax'].forEach(id => $(id).addEventListener('input', () => { saveFilters(); renderScan(); }));
 $('btnKey').onclick = () => { $('keyBar').classList.toggle('hidden'); $('keyInput').value = lsGet(LS.key) || ''; };
 $('keySave').onclick = () => { lsSet(LS.key, $('keyInput').value.trim()); toast('API Key 已保存到本机浏览器'); $('keyBar').classList.add('hidden'); };
 $('keyClear').onclick = () => { localStorage.removeItem(LS.key); $('keyInput').value=''; toast('已清除本机保存的 Key'); };
 
+/* =====================================================================
+ *  跨设备同步（GitHub 私密 Gist · 手动触发）
+ * ===================================================================== */
+const SYNC_FILE = 'dayscan-sync.json';
+const syncCfg = () => ({ token: lsGet('dt_gh_token')||'', gist: lsGet('dt_gist_id')||'', withKey: lsGet('dt_sync_key')===true });
+function readFilters(){ return { chg:$('fChg').value, rvol:$('fRvol').value, min:$('fMin').value, max:$('fMax').value }; }
+function saveFilters(){ lsSet('dt_filters', { ts:Date.now(), v:readFilters() }); }
+function setFilters(v){ $('fChg').value=v.chg; $('fRvol').value=v.rvol; $('fMin').value=v.min; $('fMax').value=v.max; }
+function loadFilters(){ const f = lsGet('dt_filters'); if(f && f.v) setFilters(f.v); }
+function setSyncStatus(msg, err=false){ const el=$('syncStatus'); el.textContent=msg; el.style.color = err ? 'var(--down)' : ''; }
+
+function buildPayload(withKey){
+  const p = { v:1, savedAt:Date.now(), quota:quota(), filters:lsGet('dt_filters'), scan:lsGet(LS.scan) };
+  if(withKey){ const k = lsGet(LS.key); if(k) p.key = k; }
+  return p;
+}
+
+function applyPayload(r, withKey){
+  if(!r || r.v!==1) throw new Error('不是有效的 DayScan 同步数据');
+  const notes = [];
+  // 额度：同一天内，各设备计数取最大值再求和
+  if(r.quota && r.quota.day === utcDay()){
+    const l = quota(), dev = {...l.dev};
+    for(const [d,n] of Object.entries(r.quota.dev||{})) dev[d] = Math.max(dev[d]||0, n);
+    lsSet(LS.quota, { day:l.day, used:0, dev }); renderQuota(); notes.push('额度');
+  }
+  // 筛选条件：谁更新谁生效
+  const lf = lsGet('dt_filters');
+  if(r.filters && r.filters.v && (!lf || r.filters.ts > lf.ts)){ setFilters(r.filters.v); lsSet('dt_filters', r.filters); notes.push('筛选条件'); }
+  // 扫描缓存：取较新的
+  const ls = lsGet(LS.scan);
+  if(r.scan && r.scan.rows && (!ls || r.scan.ts > ls.ts)){
+    lsSet(LS.scan, r.scan); notes.push('扫描缓存');
+    if(state.live){ state.raw = r.scan.rows; state.scanTs = r.scan.ts; }
+  }
+  // API Key：仅当勾选同步 Key 且本机还没有时导入
+  if(withKey && r.key && !lsGet(LS.key)){ lsSet(LS.key, r.key); notes.push('API Key'); }
+  renderScan();
+  return notes;
+}
+
+async function gh(path, opt={}){
+  const { token } = syncCfg();
+  const headers = { Accept:'application/vnd.github+json', Authorization:'Bearer '+token };
+  if(opt.body) headers['Content-Type'] = 'application/json';
+  const res = await fetch('https://api.github.com'+path, { ...opt, headers });
+  if(!res.ok){ let m = res.statusText; try{ m = (await res.json()).message || m; }catch{} throw new Error(`GitHub ${res.status}: ${m}`); }
+  return res.json();
+}
+async function findGist(){ const list = await gh('/gists?per_page=100'); const g = list.find(x => x.files && x.files[SYNC_FILE]); return g ? g.id : ''; }
+async function readGist(id){
+  const g = await gh('/gists/'+id), f = g.files && g.files[SYNC_FILE];
+  if(!f) return null;
+  const txt = f.truncated ? await (await fetch(f.raw_url)).text() : f.content;
+  return JSON.parse(txt);
+}
+
+async function syncNow(){
+  const cfg = syncCfg();
+  if(!cfg.token){ setSyncStatus('请先填写 GitHub 令牌并点「保存设置」', true); return; }
+  const btn = $('syncNow'); btn.disabled = true; setSyncStatus('同步中…');
+  try{
+    let id = cfg.gist || await findGist();
+    if(id) lsSet('dt_gist_id', id);
+    let notes = [];
+    if(id){ const remote = await readGist(id); if(remote) notes = applyPayload(remote, cfg.withKey); }   // 先拉取并合并
+    const content = JSON.stringify(buildPayload(cfg.withKey));
+    const files = { [SYNC_FILE]: { content } };
+    if(id) await gh('/gists/'+id, { method:'PATCH', body:JSON.stringify({ description:'DayScan sync data', files }) });
+    else { const g = await gh('/gists', { method:'POST', body:JSON.stringify({ description:'DayScan sync data', public:false, files }) }); id = g.id; lsSet('dt_gist_id', id); }
+    $('ghGist').value = id;
+    setSyncStatus(`同步完成 ${new Date().toLocaleTimeString()} · 从云端合并：${notes.length?notes.join('、'):'无新内容'} · 已上传本机最新数据`);
+    toast('同步完成');
+  }catch(e){ setSyncStatus('同步失败：'+e.message, true); toast('同步失败：'+e.message, 6000); }
+  finally{ btn.disabled = false; }
+}
+
+function exportJson(){
+  const blob = new Blob([JSON.stringify(buildPayload(syncCfg().withKey), null, 2)], { type:'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'dayscan-sync-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+}
+async function importJson(file){
+  try{ const notes = applyPayload(JSON.parse(await file.text()), syncCfg().withKey); setSyncStatus('导入完成：'+(notes.length?notes.join('、'):'无新内容')); toast('导入完成'); }
+  catch(e){ setSyncStatus('导入失败：'+e.message, true); }
+}
+
+$('btnSync').onclick = () => {
+  $('syncBar').classList.toggle('hidden');
+  const c = syncCfg(); $('ghToken').value = c.token; $('ghGist').value = c.gist; $('syncWithKey').checked = c.withKey;
+};
+$('syncSaveCfg').onclick = () => {
+  lsSet('dt_gh_token', $('ghToken').value.trim()); lsSet('dt_gist_id', $('ghGist').value.trim()); lsSet('dt_sync_key', $('syncWithKey').checked);
+  setSyncStatus('设置已保存到本机'); toast('同步设置已保存');
+};
+$('syncWithKey').onchange = () => lsSet('dt_sync_key', $('syncWithKey').checked);
+$('syncNow').onclick = syncNow;
+$('syncExport').onclick = exportJson;
+$('syncImport').onclick = () => $('syncFile').click();
+$('syncFile').onchange = e => { if(e.target.files[0]) importJson(e.target.files[0]); e.target.value = ''; };
+$('syncReset').onclick = () => { ['dt_gh_token','dt_gist_id','dt_sync_key'].forEach(k=>localStorage.removeItem(k)); $('ghToken').value=''; $('ghGist').value=''; $('syncWithKey').checked=false; setSyncStatus('已断开（云端 Gist 未删除）'); };
+
 /* 初始化：不自动请求任何数据 */
-renderQuota(); renderMode();
+loadFilters(); renderQuota(); renderMode();
 if(state.live && !getKey()) state.live = false;
 setMode(state.live);
 
