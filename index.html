@@ -27,6 +27,8 @@
   .btn-primary { background:#1b4a86; border-color:#2a6bc0; color:#fff; }
   .btn-primary:hover { background:#2260ad; }
   .btn:disabled { opacity:.5; cursor:not-allowed; }
+  select.btn { padding:5px 8px; cursor:pointer; color:var(--txt); }
+  select.btn option { background:#11151d; color:#d5dbe6; }
   input[type=number], input[type=text], input[type=password] { background:#0b0e14; border:1px solid var(--line); border-radius:6px; padding:4px 8px; color:var(--txt); font-size:12px; width:100%; }
   .switch { position:relative; width:42px; height:22px; background:#2a3242; border-radius:999px; cursor:pointer; transition:.2s; flex:none; }
   .switch::after { content:""; position:absolute; top:3px; left:3px; width:16px; height:16px; background:#fff; border-radius:50%; transition:.2s; }
@@ -39,30 +41,35 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
-<!-- ===================== 头部 ===================== -->
+<!-- ===================== 头部 / Header ===================== -->
 <header class="flex flex-wrap items-center gap-3 px-4 py-3 border-b" style="border-color:var(--line)">
   <div class="flex items-center gap-2">
     <span class="text-lg font-bold tracking-wider" style="color:var(--acc)">▌DAYSCAN</span>
-    <span class="mute text-xs hidden sm:inline">US Day-Trading Scanner · FMP × eToro</span>
+    <span class="mute text-xs hidden sm:inline" data-i18n="sub"></span>
   </div>
 
   <div class="ml-auto flex flex-wrap items-center gap-3 text-xs">
     <!-- API 额度计数器 -->
-    <div class="panel px-3 py-1.5 flex items-center gap-2" title="本地估算：每次真实 API 请求 +1，UTC 0 点重置（请以 FMP 后台为准）">
-      <span class="mute">API 额度</span>
+    <div class="panel px-3 py-1.5 flex items-center gap-2" data-i18n-title="quotaTip">
+      <span class="mute" data-i18n="quotaLabel"></span>
       <span id="quotaText" class="font-bold">0 / 250</span>
       <div class="w-20 h-1.5 rounded bg-[#222a39] overflow-hidden"><div id="quotaBar" class="h-full" style="width:0;background:var(--up)"></div></div>
-      <span class="mute">剩余 <b id="quotaLeft" class="text-white">250</b></span>
+      <span class="mute"><span data-i18n="quotaLeftLabel"></span> <b id="quotaLeft" class="text-white">250</b></span>
     </div>
 
+    <!-- 语言切换 / Language -->
+    <select id="langSel" class="btn" aria-label="Language / 语言">
+      <option value="zh">🌐 中文</option>
+      <option value="en">🌐 English</option>
+    </select>
+
     <button id="btnKey" class="btn">🔑 API Key</button>
-    <button id="btnSync" class="btn">☁ 同步</button>
 
     <!-- 测试 / 真实 切换 -->
     <div class="flex items-center gap-2">
-      <span id="modeMock" class="font-bold">测试模式</span>
-      <div id="modeSwitch" class="switch" role="switch" aria-label="切换测试/真实API"></div>
-      <span id="modeLive" class="mute">真实 API</span>
+      <span id="modeMock" class="font-bold" data-i18n="modeMock"></span>
+      <div id="modeSwitch" class="switch" role="switch" data-i18n-aria="modeAria"></div>
+      <span id="modeLive" class="mute" data-i18n="modeLive"></span>
     </div>
   </div>
 </header>
@@ -70,55 +77,34 @@
 <!-- API Key 设置条 -->
 <div id="keyBar" class="hidden px-4 py-3 border-b text-xs" style="border-color:var(--line);background:#0e121a">
   <div class="flex flex-wrap items-center gap-2 max-w-3xl">
-    <span class="mute">FMP API Key（仅保存在你浏览器 localStorage，优先级高于代码里的常量）</span>
-    <input id="keyInput" type="password" placeholder="粘贴你的 FMP API Key" class="flex-1 min-w-[220px]" style="width:auto">
-    <button id="keySave" class="btn btn-primary">保存</button>
-    <button id="keyClear" class="btn">清除</button>
+    <span class="mute" data-i18n="keyHint"></span>
+    <input id="keyInput" type="password" data-i18n-ph="keyPh" class="flex-1 min-w-[220px]" style="width:auto">
+    <button id="keySave" class="btn btn-primary" data-i18n="save"></button>
+    <button id="keyClear" class="btn" data-i18n="clear"></button>
   </div>
 </div>
 
-<!-- 跨设备同步面板 -->
-<div id="syncBar" class="hidden px-4 py-3 border-b text-xs" style="border-color:var(--line);background:#0e121a">
-  <div class="max-w-3xl space-y-2">
-    <div class="mute leading-relaxed">通过你自己 GitHub 账号下的<b class="text-white">私密 Gist</b>在电脑和手机间同步：API 额度计数（按设备累加）、筛选条件、最近一次扫描缓存。只在你点击时才同步，不会自动联网。令牌只保存在本机，不会被同步。</div>
-    <div class="flex flex-wrap items-center gap-2">
-      <input id="ghToken" type="password" placeholder="GitHub 令牌（classic，仅勾选 gist 权限）" class="flex-1 min-w-[220px]" style="width:auto">
-      <input id="ghGist" type="text" placeholder="Gist ID（留空自动创建/查找）" class="min-w-[180px]" style="width:200px">
-      <button id="syncSaveCfg" class="btn">保存设置</button>
-    </div>
-    <label class="flex items-center gap-2 mute"><input id="syncWithKey" type="checkbox"> 同时同步 FMP API Key（不推荐：Gist 内容是明文，知道链接的人都能看到）</label>
-    <div class="flex flex-wrap items-center gap-2">
-      <button id="syncNow" class="btn btn-primary">⇅ 立即同步（合并后上传）</button>
-      <button id="syncExport" class="btn">⬇ 导出 JSON</button>
-      <button id="syncImport" class="btn">⬆ 导入 JSON</button>
-      <button id="syncReset" class="btn">断开</button>
-      <input id="syncFile" type="file" accept="application/json,.json" class="hidden">
-    </div>
-    <div id="syncStatus" class="mute"></div>
-  </div>
-</div>
-
-<!-- ===================== 主体 ===================== -->
+<!-- ===================== 主体 / Main ===================== -->
 <main class="flex-1 grid gap-3 p-3 lg:grid-cols-[380px_1fr] min-h-0">
 
   <!-- 左：扫描面板 -->
   <section class="panel flex flex-col min-h-[420px] lg:h-[calc(100vh-120px)]">
     <div class="p-3 border-b" style="border-color:var(--line)">
       <div class="flex items-center justify-between mb-2">
-        <h2 class="font-bold text-sm">异动扫描 <span id="countBadge" class="badge mute">0</span></h2>
-        <button id="btnRefresh" class="btn btn-primary">⟳ 手动刷新 (Refresh Data)</button>
+        <h2 class="font-bold text-sm"><span data-i18n="scanTitle"></span> <span id="countBadge" class="badge mute">0</span></h2>
+        <button id="btnRefresh" class="btn btn-primary" data-i18n="refresh"></button>
       </div>
-      <div id="scanMeta" class="mute text-[11px] mb-2">尚未加载</div>
+      <div id="scanMeta" class="mute text-[11px] mb-2"></div>
       <div class="grid grid-cols-4 gap-2 text-[11px]">
-        <label>涨幅 &gt; %<input id="fChg" type="number" step="0.5" value="3"></label>
-        <label>RVOL &gt;<input id="fRvol" type="number" step="0.1" value="2.0"></label>
-        <label>价格 ≥ $<input id="fMin" type="number" step="0.5" value="1"></label>
-        <label>价格 ≤ $<input id="fMax" type="number" step="1" value="50"></label>
+        <label><span data-i18n="fChg"></span><input id="fChg" type="number" step="0.5" value="3"></label>
+        <label><span data-i18n="fRvol"></span><input id="fRvol" type="number" step="0.1" value="2.0"></label>
+        <label><span data-i18n="fMin"></span><input id="fMin" type="number" step="0.5" value="1"></label>
+        <label><span data-i18n="fMax"></span><input id="fMax" type="number" step="1" value="50"></label>
       </div>
-      <div class="mute text-[10px] mt-2">修改筛选条件只在本地重新过滤缓存数据，不消耗 API。</div>
+      <div class="mute text-[10px] mt-2" data-i18n="filterHint"></div>
     </div>
     <div id="scanList" class="flex-1 overflow-y-auto text-sm"></div>
-    <div class="px-3 py-2 border-t mute text-[10px]" style="border-color:var(--line)">点击股票 → 才会请求该股 5 分钟 K 线（懒加载，消耗 1 次请求）</div>
+    <div class="px-3 py-2 border-t mute text-[10px]" style="border-color:var(--line)" data-i18n="scanFoot"></div>
   </section>
 
   <!-- 右：图表与分析 -->
@@ -135,13 +121,13 @@
         </div>
         <div class="ml-auto flex items-center gap-2 text-xs">
           <span id="candleMeta" class="mute"></span>
-          <button id="btnReloadCandle" class="btn" disabled>重新加载K线 (-1)</button>
+          <button id="btnReloadCandle" class="btn" disabled data-i18n="reloadCandle"></button>
         </div>
       </div>
       <div id="legend" class="mt-2 text-[11px] mute h-4"></div>
       <div class="relative">
         <div id="chart" class="w-full" style="height:430px"></div>
-        <div id="chartEmpty" class="absolute inset-0 flex items-center justify-center mute text-sm">← 从左侧选择一支股票查看 5 分钟 K 线 + VWAP</div>
+        <div id="chartEmpty" class="absolute inset-0 flex items-center justify-center mute text-sm text-center px-4"></div>
       </div>
     </div>
 
@@ -149,40 +135,40 @@
     <div class="panel p-4" id="riskCard">
       <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h3 class="font-bold text-sm flex items-center gap-2">
-          <span class="inline-block w-2 h-2 rounded-full" style="background:#7cc242"></span> eToro 交易风控卡片
+          <span class="inline-block w-2 h-2 rounded-full" style="background:#7cc242"></span> <span data-i18n="riskTitle"></span>
         </h3>
         <div class="flex items-center gap-2">
           <span id="sessionBadge" class="badge"></span>
-          <button id="btnCopy" class="btn" disabled>📋 复制代码 (Ticker)</button>
+          <button id="btnCopy" class="btn" disabled data-i18n="copyBtn"></button>
         </div>
       </div>
 
       <div class="grid md:grid-cols-3 gap-3 text-xs">
         <div class="p-3 rounded-md" style="background:#0e121a;border:1px solid var(--line)">
-          <div class="mute mb-1">流动性 / 预估点差</div>
+          <div class="mute mb-1" data-i18n="liqTitle"></div>
           <div id="liqLevel" class="text-base font-bold">—</div>
           <div id="liqNote" class="mute mt-1 leading-relaxed"></div>
         </div>
         <div class="p-3 rounded-md" style="background:#0e121a;border:1px solid #6b4a12">
-          <div class="mb-1" style="color:#f5a524">⚠ 订单类型</div>
-          <div class="font-bold text-sm">务必使用「限价单 Limit Order」进场</div>
-          <div class="mute mt-1 leading-relaxed">市价单在高波动小盘股上容易严重滑点；eToro 点差本身已含成本，进场价请手动设定并设置止损。</div>
+          <div class="mb-1" style="color:#f5a524" data-i18n="orderTitle"></div>
+          <div class="font-bold text-sm" data-i18n="orderMain"></div>
+          <div class="mute mt-1 leading-relaxed" data-i18n="orderDesc"></div>
         </div>
         <div class="p-3 rounded-md" style="background:#0e121a;border:1px solid var(--line)">
-          <div class="mute mb-1">参考价位（仅为示意）</div>
+          <div class="mute mb-1" data-i18n="refTitle"></div>
           <div class="space-y-0.5">
-            <div>现价：<b id="rkLast">—</b></div>
-            <div>VWAP：<b id="rkVwap">—</b></div>
-            <div>参考限价区间：<b id="rkLimit">—</b></div>
+            <div><span data-i18n="rkLastL"></span><b id="rkLast">—</b></div>
+            <div><span data-i18n="rkVwapL"></span><b id="rkVwap">—</b></div>
+            <div><span data-i18n="rkLimitL"></span><b id="rkLimit">—</b></div>
           </div>
-          <div class="mute mt-1 text-[10px]">区间 = 现价与 VWAP 之间的回踩区，非投资建议。</div>
+          <div class="mute mt-1 text-[10px]" data-i18n="refNote"></div>
         </div>
       </div>
 
       <ul class="mute text-[11px] mt-3 space-y-1 list-disc pl-5">
-        <li>盘前 / 盘后及开盘前几分钟，eToro 点差可能明显拉大，成交价会偏离图表价格。</li>
-        <li>eToro 对美股通常以其做市价格执行，且可能有非交易时段限制，请以平台内实际报价为准。</li>
-        <li>日内交易亏损风险高；合理设置止损，避免杠杆放大损失。</li>
+        <li data-i18n="tip1"></li>
+        <li data-i18n="tip2"></li>
+        <li data-i18n="tip3"></li>
       </ul>
     </div>
   </section>
@@ -192,7 +178,7 @@
 
 <script>
 /* =====================================================================
- *  ★★★ 在这里替换你的 FMP API Key ★★★
+ *  ★★★ 在这里替换你的 FMP API Key / Replace your FMP API Key here ★★★
  *  方式 A：直接改下面这行的字符串（注意：部署到 GitHub Pages 后 Key 会公开可见！）
  *  方式 B（推荐）：留空，页面右上角点「🔑 API Key」输入，只保存在你自己浏览器里
  * ===================================================================== */
@@ -201,7 +187,122 @@ const FMP_API_KEY = 'YOUR_FMP_API_KEY';
 const FMP_BASE   = 'https://financialmodelingprep.com/stable';
 const DAILY_LIMIT = 250;
 const CANDLE_TTL_MS = 5 * 60 * 1000;      // K线缓存 5 分钟
-const LS = { quota:'dt_quota', mode:'dt_mode', key:'dt_key', scan:'dt_scan_cache', candle:'dt_candle_' };
+const LS = { quota:'dt_quota', mode:'dt_mode', key:'dt_key', scan:'dt_scan_cache', candle:'dt_candle_', lang:'dt_lang' };
+
+/* =====================================================================
+ *  多语言 / i18n
+ *  新增语言：在 I18N 里加一个同结构的对象（如 ms），并在 <select id="langSel"> 加一个 <option>。
+ * ===================================================================== */
+const I18N = {
+  zh: {
+    title:'DayScan · 美股日内交易扫描器',
+    sub:'美股日内扫描 · FMP × eToro',
+    quotaLabel:'API 额度', quotaLeftLabel:'剩余',
+    quotaTip:'本地估算：每次真实 API 请求 +1，UTC 0 点重置（请以 FMP 后台为准）',
+    modeMock:'测试模式', modeLive:'真实 API', modeAria:'切换测试/真实API',
+    keyHint:'FMP API Key（仅保存在你浏览器 localStorage，优先级高于代码里的常量）',
+    keyPh:'粘贴你的 FMP API Key', save:'保存', clear:'清除',
+    scanTitle:'异动扫描', refresh:'⟳ 手动刷新 (Refresh Data)', loading:'加载中…',
+    notLoaded:'尚未加载，请点击「手动刷新」',
+    fChg:'涨幅 > %', fRvol:'RVOL >', fMin:'价格 ≥ $', fMax:'价格 ≤ $',
+    filterHint:'修改筛选条件只在本地重新过滤缓存数据，不消耗 API。',
+    scanFoot:'点击股票 → 才会请求该股 5 分钟 K 线（懒加载，消耗 1 次请求）',
+    reloadCandle:'重新加载K线 (-1)',
+    chartHint:'← 从左侧选择一支股票查看 5 分钟 K 线 + VWAP',
+    chartLoading:'加载 K 线中…', chartFail:'加载失败：{msg}',
+    riskTitle:'eToro 交易风控卡片', copyBtn:'📋 复制代码 (Ticker)',
+    liqTitle:'流动性 / 预估点差',
+    orderTitle:'⚠ 订单类型', orderMain:'务必使用「限价单 Limit Order」进场',
+    orderDesc:'市价单在高波动小盘股上容易严重滑点；eToro 点差本身已含成本，进场价请手动设定并设置止损。',
+    refTitle:'参考价位（仅为示意）', rkLastL:'现价：', rkVwapL:'VWAP：', rkLimitL:'参考限价区间：',
+    refNote:'区间 = 现价与 VWAP 之间的回踩区，非投资建议。',
+    rkVwapNone:'—（加载K线后显示）',
+    tip1:'盘前 / 盘后及开盘前几分钟，eToro 点差可能明显拉大，成交价会偏离图表价格。',
+    tip2:'eToro 对美股通常以其做市价格执行，且可能有非交易时段限制，请以平台内实际报价为准。',
+    tip3:'日内交易亏损风险高；合理设置止损，避免杠杆放大损失。',
+    sessWeekend:'休市（周末）', sessPre:'盘前 Pre-Market', sessOpen:'开盘后15分钟', sessRegular:'盘中 Regular', sessAfter:'盘后 After-Hours', sessClosed:'休市',
+    liqBad:'较差 · 点差可能很宽', liqBadNote:'低流动性/高波动，eToro 实际成交价可能明显偏离图表价格。建议减小仓位或放弃。',
+    liqMid:'一般 · 点差可能拉大', liqMidNote:'点差在波动加剧时容易扩大，进场前务必先看 eToro 内实时买卖价。',
+    liqGood:'较好 · 点差相对可控', liqGoodNote:'仍请在 eToro 内核对实时点差；消息驱动行情中点差会瞬间变宽。',
+    offHours:' 当前处于非常规/开盘时段，点差风险更高。',
+    tagLive:'真实数据', tagMock:'模拟数据',
+    scanMeta:'{tag} · 更新于 {time}（{ago}）· 共 {n} 条原始记录',
+    justNow:'刚刚', minsAgo:'{m} 分钟前',
+    noMatch:'没有符合当前筛选条件的股票', noData:'暂无数据', rvolNA:'未知',
+    candleMeta:'{n} 根 · {src}', srcMock:'模拟', srcCache:'缓存 {m} 分钟前', srcApi:'实时拉取',
+    errNoKey:'未设置 FMP API Key（点击右上角 🔑 API Key 或修改代码常量）',
+    errQuota:'本地估算今日额度已用完（250），已阻止请求',
+    refreshed:'已刷新真实数据', mockToast:'测试模式：使用模拟数据（不消耗额度）',
+    refreshFail:'刷新失败：{msg}',
+    confirmRefresh:'本次刷新约消耗 3 次 API 请求（今日已用 {used}/{limit}）。继续？',
+    batchFail:'批量报价获取失败（免费版可能不支持 batch-quote），RVOL 将显示为未知：{msg}',
+    noBars:'没有返回K线数据（休市或该股暂无5分钟数据）', candleFail:'K线加载失败：{msg}',
+    copied:'已复制 {sym}，到 eToro 搜索栏粘贴即可',
+    needKey:'请先设置 FMP API Key 再切换到真实模式', loadedCache:'已载入上次缓存数据（未消耗额度）',
+    confirmReload:'重新加载将消耗 1 次 API 请求，继续？',
+    keySaved:'API Key 已保存到本机浏览器', keyCleared:'已清除本机保存的 Key'
+  },
+  en: {
+    title:'DayScan · US Day-Trading Scanner',
+    sub:'US Day-Trading Scanner · FMP × eToro',
+    quotaLabel:'API Quota', quotaLeftLabel:'Left',
+    quotaTip:'Local estimate: +1 per real API request, resets at 00:00 UTC (check your FMP dashboard for the real figure)',
+    modeMock:'Test Mode', modeLive:'Live API', modeAria:'Toggle test / live API',
+    keyHint:"FMP API Key (stored only in this browser's localStorage; takes priority over the constant in code)",
+    keyPh:'Paste your FMP API Key', save:'Save', clear:'Clear',
+    scanTitle:'Movers Scan', refresh:'⟳ Refresh Data', loading:'Loading…',
+    notLoaded:'Not loaded yet — click "Refresh Data"',
+    fChg:'Change > %', fRvol:'RVOL >', fMin:'Price ≥ $', fMax:'Price ≤ $',
+    filterHint:'Changing filters only re-filters cached data locally — no API calls.',
+    scanFoot:'Click a stock → only then its 5-min candles are requested (lazy load, 1 request)',
+    reloadCandle:'Reload candles (-1)',
+    chartHint:'← Pick a stock on the left to see 5-min candles + VWAP',
+    chartLoading:'Loading candles…', chartFail:'Failed to load: {msg}',
+    riskTitle:'eToro Risk Card', copyBtn:'📋 Copy Ticker',
+    liqTitle:'Liquidity / Est. Spread',
+    orderTitle:'⚠ Order Type', orderMain:'Always enter with a Limit Order',
+    orderDesc:"Market orders can slip badly on volatile small caps. eToro's spread is already a cost, so set your entry price manually and use a stop loss.",
+    refTitle:'Reference Prices (illustrative)', rkLastL:'Last: ', rkVwapL:'VWAP: ', rkLimitL:'Limit zone: ',
+    refNote:'Zone = pullback area between last price and VWAP. Not investment advice.',
+    rkVwapNone:'— (shown after candles load)',
+    tip1:'In pre-market, after-hours and the first minutes after the open, eToro spreads can widen a lot and fills may differ from chart prices.',
+    tip2:"eToro usually executes US stocks at its own market-maker prices and may restrict off-hours trading — always rely on the quote inside the platform.",
+    tip3:'Day trading carries a high risk of loss. Use a sensible stop loss and avoid leverage magnifying losses.',
+    sessWeekend:'Closed (weekend)', sessPre:'Pre-Market', sessOpen:'First 15 min after open', sessRegular:'Regular Session', sessAfter:'After-Hours', sessClosed:'Closed',
+    liqBad:'Poor · spread may be wide', liqBadNote:'Low liquidity / high volatility — your eToro fill may differ a lot from the chart price. Consider a smaller size or skipping it.',
+    liqMid:'Fair · spread may widen', liqMidNote:'Spreads tend to widen as volatility rises. Check the live bid/ask inside eToro before entering.',
+    liqGood:'Good · spread fairly contained', liqGoodNote:'Still verify the live spread in eToro; on news-driven moves spreads can widen instantly.',
+    offHours:' Currently outside regular hours or right after the open — spread risk is higher.',
+    tagLive:'Live data', tagMock:'Mock data',
+    scanMeta:'{tag} · Updated {time} ({ago}) · {n} raw records',
+    justNow:'just now', minsAgo:'{m} min ago',
+    noMatch:'No stocks match the current filters', noData:'No data', rvolNA:'N/A',
+    candleMeta:'{n} bars · {src}', srcMock:'mock', srcCache:'cached {m} min ago', srcApi:'fetched live',
+    errNoKey:'FMP API Key not set (click 🔑 API Key at top right, or edit the constant in code)',
+    errQuota:"Local estimate says today's quota (250) is used up; request blocked",
+    refreshed:'Live data refreshed', mockToast:'Test mode: using mock data (no quota used)',
+    refreshFail:'Refresh failed: {msg}',
+    confirmRefresh:'This refresh uses about 3 API requests (used today: {used}/{limit}). Continue?',
+    batchFail:'Batch quote failed (the free plan may not support batch-quote); RVOL will show as N/A: {msg}',
+    noBars:'No candle data returned (market closed, or no 5-min data for this stock)', candleFail:'Candle load failed: {msg}',
+    copied:'Copied {sym} — paste it into the eToro search bar',
+    needKey:'Set your FMP API Key before switching to live mode', loadedCache:'Loaded last cached data (no quota used)',
+    confirmReload:'Reloading will use 1 API request. Continue?',
+    keySaved:'API Key saved in this browser', keyCleared:'Saved key cleared'
+  }
+};
+
+function detectLang(){
+  const saved = (()=>{ try { return JSON.parse(localStorage.getItem('dt_lang')); } catch { return null; } })();
+  if(saved && I18N[saved]) return saved;
+  return (navigator.language||'').toLowerCase().startsWith('zh') ? 'zh' : 'en';
+}
+let LANG = detectLang();
+function t(key, vars){
+  const s = (I18N[LANG] && I18N[LANG][key]) ?? I18N.zh[key] ?? key;
+  return vars ? s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '') : s;
+}
+const locale = () => LANG==='zh' ? 'zh-CN' : 'en-US';
 
 /* ---------------------------- 工具函数 ---------------------------- */
 const $ = id => document.getElementById(id);
@@ -210,7 +311,7 @@ const fmtVol = v => v==null ? '—' : v>=1e6 ? (v/1e6).toFixed(2)+'M' : v>=1e3 ?
 const lsGet = (k, def=null) => { try { const v = localStorage.getItem(k); return v==null?def:JSON.parse(v); } catch { return def; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} };
 const utcDay = () => new Date().toISOString().slice(0,10);
-function toast(msg, ms=3200){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'), ms); }
+function toast(msg, ms=3200){ const el=$('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'), ms); }
 function getKey(){ return (lsGet(LS.key) || (FMP_API_KEY==='YOUR_FMP_API_KEY' ? '' : FMP_API_KEY) || '').trim(); }
 
 /* ---------------------------- 状态 ---------------------------- */
@@ -220,18 +321,14 @@ const state = {
   scanTs: null,
   selected: null,
   chart: null, candleSeries: null, vwapSeries: null, volSeries: null,
-  bars: [], vwap: []
+  bars: [], vwap: [],
+  empty: { key:'chartHint' },   // 图表遮罩提示（可随语言重新渲染）
+  candleInfo: null,            // { n, from, ts }
+  riskLive: null               // { last, vwap }
 };
 
 /* ---------------------------- API 额度计数 ---------------------------- */
-const DEVICE_ID = (()=>{ let d=lsGet('dt_device'); if(!d){ d=Math.random().toString(36).slice(2,8); lsSet('dt_device',d); } return d; })();
-function quota(){
-  const q = lsGet(LS.quota, null);
-  if(!q || q.day!==utcDay()) return {day:utcDay(), used:0, dev:{}};
-  if(!q.dev) q.dev = {[DEVICE_ID]: q.used||0};                 // 兼容旧数据
-  q.used = Object.values(q.dev).reduce((a,b)=>a+b,0);          // 总用量 = 各设备之和
-  return q;
-}
+function quota(){ const q = lsGet(LS.quota, {day:utcDay(), used:0}); if(q.day!==utcDay()) return {day:utcDay(), used:0}; return q; }
 function renderQuota(){
   const q = quota(), left = Math.max(0, DAILY_LIMIT - q.used), pct = Math.min(100, q.used/DAILY_LIMIT*100);
   $('quotaText').textContent = `${q.used} / ${DAILY_LIMIT}`;
@@ -239,13 +336,13 @@ function renderQuota(){
   const bar = $('quotaBar'); bar.style.width = pct+'%';
   bar.style.background = pct>85 ? 'var(--down)' : pct>60 ? '#f5a524' : 'var(--up)';
 }
-function addQuota(n=1){ const q = quota(); q.dev[DEVICE_ID]=(q.dev[DEVICE_ID]||0)+n; q.used+=n; lsSet(LS.quota, q); renderQuota(); }
+function addQuota(n=1){ const q = quota(); q.used += n; lsSet(LS.quota, q); renderQuota(); }
 
 /* ---------------------------- FMP 请求封装 ---------------------------- */
 async function fmp(path, params={}){
   const key = getKey();
-  if(!key) throw new Error('未设置 FMP API Key（点击右上角 🔑 API Key 或修改代码常量）');
-  if(quota().used >= DAILY_LIMIT) throw new Error('本地估算今日额度已用完（250），已阻止请求');
+  if(!key) throw new Error(t('errNoKey'));
+  if(quota().used >= DAILY_LIMIT) throw new Error(t('errQuota'));
   const url = new URL(FMP_BASE + path);
   Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
   url.searchParams.set('apikey', key);
@@ -264,7 +361,7 @@ async function fmp(path, params={}){
  *  模拟数据（Mock）
  * ===================================================================== */
 function hashSeed(s){ let h=2166136261; for(const c of s){ h^=c.charCodeAt(0); h=Math.imul(h,16777619);} return h>>>0; }
-function rng(seed){ let a=seed; return ()=>{ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function rng(seed){ let a=seed; return ()=>{ a|=0; a=a+0x6D2B79F5|0; let x=Math.imul(a^a>>>15,1|a); x=x+Math.imul(x^x>>>7,61|x)^x; return ((x^x>>>14)>>>0)/4294967296; }; }
 
 const MOCK_SCAN = [
   ['SMCX','Summit Micro Devices',4.82,18.4,1480000,210000],
@@ -275,10 +372,10 @@ const MOCK_SCAN = [
   ['CRDO2','Cordova Robotics',38.2,4.6,1700000,820000],
   ['HLIO','Helio Solar',1.62,12.9,22000000,4000000],
   ['TMBR','Timber Holdings',45.1,3.4,1250000,600000],
-  ['GXYZ','Galaxy Z Mobility',73.5,5.8,4100000,1200000],   // 价格超限
-  ['LOWV','LowVol Utilities',15.4,3.9,310000,280000],      // RVOL 不足
-  ['FLAT','Flatline Corp',22.0,0.8,2600000,900000],        // 涨幅不足
-  ['PNNY','Penny Labs',0.62,25.0,31000000,2500000]         // 价格<1
+  ['GXYZ','Galaxy Z Mobility',73.5,5.8,4100000,1200000],   // 价格超限 / price too high
+  ['LOWV','LowVol Utilities',15.4,3.9,310000,280000],      // RVOL 不足 / RVOL too low
+  ['FLAT','Flatline Corp',22.0,0.8,2600000,900000],        // 涨幅不足 / change too small
+  ['PNNY','Penny Labs',0.62,25.0,31000000,2500000]         // 价格<1 / price < $1
 ].map(([symbol,name,price,chg,volume,avgVolume])=>({symbol,name,price,changePct:chg,volume,avgVolume,rvol:+(volume/avgVolume).toFixed(2)}));
 
 function mockCandles(sym, lastPrice, changePct){
@@ -327,30 +424,30 @@ async function loadScanLive(){
         if(c.volume && c.avgVolume) c.rvol = +(c.volume/c.avgVolume).toFixed(2);
       });
     }catch(e){
-      toast('批量报价获取失败（免费版可能不支持 batch-quote），RVOL 将显示为未知：'+e.message, 6000);
+      toast(t('batchFail',{msg:e.message}), 6000);
     }
   }
   return cands;
 }
 
 async function refreshScan(){
-  const btn = $('btnRefresh'); btn.disabled = true; btn.textContent = '加载中…';
+  const btn = $('btnRefresh'); btn.disabled = true; btn.textContent = t('loading');
   try{
     if(state.live){
-      if(!confirm(`本次刷新约消耗 3 次 API 请求（今日已用 ${quota().used}/${DAILY_LIMIT}）。继续？`)) return;
+      if(!confirm(t('confirmRefresh',{used:quota().used, limit:DAILY_LIMIT}))) return;
       state.raw = await loadScanLive();
       state.scanTs = Date.now();
       lsSet(LS.scan, { ts:state.scanTs, rows:state.raw });
-      toast('已刷新真实数据');
+      toast(t('refreshed'));
     } else {
       await new Promise(r=>setTimeout(r,250));
       // 每次刷新在模拟数据上加一点随机扰动，便于调试 UI
       state.raw = MOCK_SCAN.map(r => { const j=1+(Math.random()-0.5)*0.01; return {...r, price:+(r.price*j).toFixed(2)}; });
       state.scanTs = Date.now();
-      toast('测试模式：使用模拟数据（不消耗额度）');
+      toast(t('mockToast'));
     }
-  }catch(e){ toast('刷新失败：'+e.message, 6000); }
-  finally{ btn.disabled=false; btn.textContent='⟳ 手动刷新 (Refresh Data)'; renderScan(); }
+  }catch(e){ toast(t('refreshFail',{msg:e.message}), 6000); }
+  finally{ btn.disabled=false; btn.textContent=t('refresh'); renderScan(); }
 }
 
 /* ---------------------------- 渲染扫描列表 ---------------------------- */
@@ -364,10 +461,14 @@ function renderScan(){
   const meta = $('scanMeta');
   if(state.scanTs){
     const mins = Math.round((Date.now()-state.scanTs)/60000);
-    meta.innerHTML = `${state.live?'<span style="color:#f97316">● 真实数据</span>':'<span style="color:#4aa3ff">● 模拟数据</span>'} · 更新于 ${new Date(state.scanTs).toLocaleTimeString()}（${mins<1?'刚刚':mins+' 分钟前'}）· 共 ${state.raw.length} 条原始记录`;
-  } else meta.textContent = '尚未加载，请点击「手动刷新」';
+    const tag = state.live ? `<span style="color:#f97316">● ${t('tagLive')}</span>` : `<span style="color:#4aa3ff">● ${t('tagMock')}</span>`;
+    meta.innerHTML = t('scanMeta', {
+      tag, time: new Date(state.scanTs).toLocaleTimeString(locale()),
+      ago: mins<1 ? t('justNow') : t('minsAgo',{m:mins}), n: state.raw.length
+    });
+  } else meta.textContent = t('notLoaded');
   const list = $('scanList');
-  if(!rows.length){ list.innerHTML = `<div class="p-6 text-center mute text-xs">${state.raw.length?'没有符合当前筛选条件的股票':'暂无数据'}</div>`; return; }
+  if(!rows.length){ list.innerHTML = `<div class="p-6 text-center mute text-xs">${state.raw.length ? t('noMatch') : t('noData')}</div>`; return; }
   list.innerHTML = rows.map(r => `
     <div class="row px-3 py-2.5 ${state.selected?.symbol===r.symbol?'active':''}" data-sym="${r.symbol}">
       <div class="flex items-center justify-between">
@@ -379,7 +480,7 @@ function renderScan(){
         <span>$${fmt(r.price)}</span>
       </div>
       <div class="flex items-center gap-2 text-[11px] mt-1">
-        <span class="badge ${r.rvol==null?'mute':'up'}">RVOL ${r.rvol==null?'未知':fmt(r.rvol,1)+'x'}</span>
+        <span class="badge ${r.rvol==null?'mute':'up'}">RVOL ${r.rvol==null?t('rvolNA'):fmt(r.rvol,1)+'x'}</span>
         <span class="mute">Vol ${fmtVol(r.volume)}</span>
       </div>
     </div>`).join('');
@@ -389,6 +490,19 @@ function renderScan(){
 /* =====================================================================
  *  K线（懒加载）
  * ===================================================================== */
+function setEmpty(key, vars){ state.empty = key ? { key, vars } : null; renderChartEmpty(); }
+function renderChartEmpty(){
+  const el = $('chartEmpty');
+  if(state.empty){ el.textContent = t(state.empty.key, state.empty.vars); el.style.display = 'flex'; }
+  else el.style.display = 'none';
+}
+function renderCandleMeta(){
+  const ci = state.candleInfo, el = $('candleMeta');
+  if(!ci){ el.textContent = ''; return; }
+  const src = ci.from==='mock' ? t('srcMock') : ci.from==='cache' ? t('srcCache',{m:Math.round((Date.now()-ci.ts)/60000)}) : t('srcApi');
+  el.textContent = t('candleMeta',{n:ci.n, src});
+}
+
 function ensureChart(){
   if(state.chart) return;
   const el = $('chart');
@@ -439,25 +553,28 @@ async function getCandles(sym, force=false){
 
 async function selectStock(sym, force=false){
   const stock = state.raw.find(r=>r.symbol===sym); if(!stock) return;
-  state.selected = stock; renderScan(); renderHeader(stock); updateRisk(stock, null);
-  $('chartEmpty').textContent = '加载 K 线中…'; $('chartEmpty').style.display='flex';
+  state.selected = stock; state.riskLive = null; state.candleInfo = null;
+  renderScan(); renderHeader(stock); updateRisk(stock, null); renderCandleMeta();
+  setEmpty('chartLoading');
   $('btnCopy').disabled = false; $('btnReloadCandle').disabled = false;
   try{
     const { bars, from, ts } = await getCandles(sym, force);
     if(state.selected?.symbol !== sym) return;           // 用户已切换
-    if(!bars.length) throw new Error('没有返回K线数据（休市或该股暂无5分钟数据）');
+    if(!bars.length) throw new Error(t('noBars'));
     ensureChart();
     state.bars = bars; state.vwap = calcVWAP(bars);
     state.candleSeries.setData(bars.map(({time,open,high,low,close})=>({time,open,high,low,close})));
     state.vwapSeries.setData(state.vwap);
     state.volSeries.setData(bars.map(b=>({ time:b.time, value:b.volume, color: b.close>=b.open ? 'rgba(38,217,139,.35)' : 'rgba(255,92,108,.35)' })));
     state.chart.timeScale().fitContent();
-    $('chartEmpty').style.display='none';
-    $('candleMeta').textContent = `${bars.length} 根 · ${from==='mock'?'模拟':from==='cache'?'缓存 '+Math.round((Date.now()-ts)/60000)+' 分钟前':'实时拉取'}`;
-    updateRisk(stock, { last: bars[bars.length-1].close, vwap: state.vwap[state.vwap.length-1].value });
+    setEmpty(null);
+    state.candleInfo = { n:bars.length, from, ts };
+    renderCandleMeta();
+    state.riskLive = { last: bars[bars.length-1].close, vwap: state.vwap[state.vwap.length-1].value };
+    updateRisk(stock, state.riskLive);
   }catch(e){
-    $('chartEmpty').textContent = '加载失败：'+e.message; $('chartEmpty').style.display='flex';
-    toast('K线加载失败：'+e.message, 6000);
+    setEmpty('chartFail', {msg:e.message});
+    toast(t('candleFail',{msg:e.message}), 6000);
   }
 }
 
@@ -473,13 +590,18 @@ function renderHeader(s){
  * ===================================================================== */
 function etSession(){
   const p = new Intl.DateTimeFormat('en-US',{ timeZone:'America/New_York', weekday:'short', hour:'2-digit', minute:'2-digit', hour12:false }).formatToParts(new Date());
-  const g = t => p.find(x=>x.type===t).value, wd=g('weekday'), m = (+g('hour')%24)*60 + +g('minute');
-  if(wd==='Sat'||wd==='Sun') return { key:'closed', label:'休市（周末）', color:'#7a8599' };
-  if(m>=240 && m<570)  return { key:'pre',    label:'盘前 Pre-Market', color:'#f5a524' };
-  if(m>=570 && m<585)  return { key:'open',   label:'开盘前15分钟',   color:'#ff8a3d' };
-  if(m>=585 && m<960)  return { key:'regular',label:'盘中 Regular',   color:'#26d98b' };
-  if(m>=960 && m<1200) return { key:'after',  label:'盘后 After-Hours',color:'#f5a524' };
-  return { key:'closed', label:'休市', color:'#7a8599' };
+  const g = ty => p.find(x=>x.type===ty).value, wd=g('weekday'), m = (+g('hour')%24)*60 + +g('minute');
+  if(wd==='Sat'||wd==='Sun') return { key:'closed', label:t('sessWeekend'), color:'#7a8599' };
+  if(m>=240 && m<570)  return { key:'pre',    label:t('sessPre'),     color:'#f5a524' };
+  if(m>=570 && m<585)  return { key:'open',   label:t('sessOpen'),    color:'#ff8a3d' };
+  if(m>=585 && m<960)  return { key:'regular',label:t('sessRegular'), color:'#26d98b' };
+  if(m>=960 && m<1200) return { key:'after',  label:t('sessAfter'),   color:'#f5a524' };
+  return { key:'closed', label:t('sessClosed'), color:'#7a8599' };
+}
+function renderSession(){
+  const ses = etSession(), sb = $('sessionBadge');
+  sb.textContent = ses.label; sb.style.color = ses.color; sb.style.borderColor = ses.color;
+  return ses;
 }
 
 function liquidityEstimate(s, ses){
@@ -491,20 +613,20 @@ function liquidityEstimate(s, ses){
   if(Math.abs(s.changePct) > 15) score += 1;
   if(['pre','after','open'].includes(ses.key)) score += 2;
   if(ses.key==='closed') score += 1;
-  if(score >= 5) return { lv:'较差 · 点差可能很宽', color:'var(--down)', note:'低流动性/高波动，eToro 实际成交价可能明显偏离图表价格。建议减小仓位或放弃。' };
-  if(score >= 3) return { lv:'一般 · 点差可能拉大', color:'#f5a524', note:'点差在波动加剧时容易扩大，进场前务必先看 eToro 内实时买卖价。' };
-  return { lv:'较好 · 点差相对可控', color:'var(--up)', note:'仍请在 eToro 内核对实时点差；消息驱动行情中点差会瞬间变宽。' };
+  if(score >= 5) return { lv:t('liqBad'),  color:'var(--down)', note:t('liqBadNote') };
+  if(score >= 3) return { lv:t('liqMid'),  color:'#f5a524',     note:t('liqMidNote') };
+  return               { lv:t('liqGood'), color:'var(--up)',   note:t('liqGoodNote') };
 }
 
 function updateRisk(s, live){
-  const ses = etSession();
-  const sb = $('sessionBadge'); sb.textContent = ses.label; sb.style.color = ses.color; sb.style.borderColor = ses.color;
+  const ses = renderSession();
+  if(!s) return;
   const est = liquidityEstimate(s, ses);
   $('liqLevel').textContent = est.lv; $('liqLevel').style.color = est.color;
-  $('liqNote').textContent = est.note + (['pre','after','open'].includes(ses.key) ? ' 当前处于非常规/开盘时段，点差风险更高。' : '');
+  $('liqNote').textContent = est.note + (['pre','after','open'].includes(ses.key) ? t('offHours') : '');
   const last = live?.last ?? s.price, vwap = live?.vwap;
   $('rkLast').textContent = '$'+fmt(last);
-  $('rkVwap').textContent = vwap!=null ? '$'+fmt(vwap) : '—（加载K线后显示）';
+  $('rkVwap').textContent = vwap!=null ? '$'+fmt(vwap) : t('rkVwapNone');
   if(vwap!=null){
     const lo = Math.min(last, vwap), hi = Math.max(last, vwap);
     $('rkLimit').textContent = Math.abs(hi-lo)/last < 0.002 ? `≈ $${fmt(last)}` : `$${fmt(lo)} – $${fmt(hi)}`;
@@ -514,14 +636,14 @@ function updateRisk(s, live){
 /* ---------------------------- 复制 Ticker ---------------------------- */
 async function copyTicker(){
   if(!state.selected) return;
-  const t = state.selected.symbol;
-  try{ await navigator.clipboard.writeText(t); }
-  catch{ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
-  toast(`已复制 ${t}，到 eToro 搜索栏粘贴即可`);
+  const sym = state.selected.symbol;
+  try{ await navigator.clipboard.writeText(sym); }
+  catch{ const ta=document.createElement('textarea'); ta.value=sym; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  toast(t('copied',{sym}));
 }
 
 /* =====================================================================
- *  模式切换 / Key 设置 / 初始化
+ *  模式切换 / Key 设置 / 语言切换 / 初始化
  * ===================================================================== */
 function renderMode(){
   $('modeSwitch').classList.toggle('live', state.live);
@@ -531,141 +653,57 @@ function renderMode(){
   $('modeMock').style.color = state.live ? '' : '#4aa3ff';
 }
 function setMode(live){
-  if(live && !getKey()){ toast('请先设置 FMP API Key 再切换到真实模式', 4500); $('keyBar').classList.remove('hidden'); return; }
+  if(live && !getKey()){ toast(t('needKey'), 4500); $('keyBar').classList.remove('hidden'); return; }
   state.live = live; lsSet(LS.mode, live); renderMode();
-  state.raw = []; state.scanTs = null; state.selected = null;
+  state.raw = []; state.scanTs = null; state.selected = null; state.riskLive = null; state.candleInfo = null;
   $('selSym').textContent='—'; $('selPrice').textContent=''; $('selChg').textContent=''; $('selName').textContent='';
   $('btnCopy').disabled = true; $('btnReloadCandle').disabled = true;
+  ['liqLevel','rkLast','rkVwap','rkLimit'].forEach(id => { $(id).textContent='—'; }); $('liqNote').textContent='';
   if(state.candleSeries){ state.candleSeries.setData([]); state.vwapSeries.setData([]); state.volSeries.setData([]); }
-  $('chartEmpty').textContent='← 从左侧选择一支股票查看 5 分钟 K 线 + VWAP'; $('chartEmpty').style.display='flex'; $('candleMeta').textContent='';
+  setEmpty('chartHint'); renderCandleMeta();
   if(live){
     const c = lsGet(LS.scan);                    // 真实模式：先展示上次缓存，不自动请求
-    if(c && c.rows){ state.raw = c.rows; state.scanTs = c.ts; toast('已载入上次缓存数据（未消耗额度）'); }
+    if(c && c.rows){ state.raw = c.rows; state.scanTs = c.ts; toast(t('loadedCache')); }
   } else {
     state.raw = MOCK_SCAN.map(r=>({...r})); state.scanTs = Date.now();
   }
-  renderScan();
+  renderScan(); renderSession();
 }
 
+/* 应用语言：刷新所有静态文案 + 重新渲染动态内容 */
+function applyLang(){
+  document.documentElement.lang = LANG==='zh' ? 'zh-CN' : 'en';
+  document.title = t('title');
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
+  $('langSel').value = LANG;
+  renderMode(); renderQuota(); renderScan(); renderChartEmpty(); renderCandleMeta();
+  if(state.selected){ renderHeader(state.selected); updateRisk(state.selected, state.riskLive); } else renderSession();
+}
+function setLang(l){
+  if(!I18N[l]) return;
+  LANG = l; lsSet(LS.lang, l); applyLang();
+}
+
+$('langSel').onchange = e => setLang(e.target.value);
 $('modeSwitch').onclick = () => setMode(!state.live);
 $('btnRefresh').onclick = refreshScan;
 $('btnCopy').onclick = copyTicker;
 $('btnReloadCandle').onclick = () => {
   if(!state.selected) return;
-  if(state.live && !confirm('重新加载将消耗 1 次 API 请求，继续？')) return;
+  if(state.live && !confirm(t('confirmReload'))) return;
   selectStock(state.selected.symbol, true);
 };
-['fChg','fRvol','fMin','fMax'].forEach(id => $(id).addEventListener('input', () => { saveFilters(); renderScan(); }));
+['fChg','fRvol','fMin','fMax'].forEach(id => $(id).addEventListener('input', renderScan));
 $('btnKey').onclick = () => { $('keyBar').classList.toggle('hidden'); $('keyInput').value = lsGet(LS.key) || ''; };
-$('keySave').onclick = () => { lsSet(LS.key, $('keyInput').value.trim()); toast('API Key 已保存到本机浏览器'); $('keyBar').classList.add('hidden'); };
-$('keyClear').onclick = () => { localStorage.removeItem(LS.key); $('keyInput').value=''; toast('已清除本机保存的 Key'); };
-
-/* =====================================================================
- *  跨设备同步（GitHub 私密 Gist · 手动触发）
- * ===================================================================== */
-const SYNC_FILE = 'dayscan-sync.json';
-const syncCfg = () => ({ token: lsGet('dt_gh_token')||'', gist: lsGet('dt_gist_id')||'', withKey: lsGet('dt_sync_key')===true });
-function readFilters(){ return { chg:$('fChg').value, rvol:$('fRvol').value, min:$('fMin').value, max:$('fMax').value }; }
-function saveFilters(){ lsSet('dt_filters', { ts:Date.now(), v:readFilters() }); }
-function setFilters(v){ $('fChg').value=v.chg; $('fRvol').value=v.rvol; $('fMin').value=v.min; $('fMax').value=v.max; }
-function loadFilters(){ const f = lsGet('dt_filters'); if(f && f.v) setFilters(f.v); }
-function setSyncStatus(msg, err=false){ const el=$('syncStatus'); el.textContent=msg; el.style.color = err ? 'var(--down)' : ''; }
-
-function buildPayload(withKey){
-  const p = { v:1, savedAt:Date.now(), quota:quota(), filters:lsGet('dt_filters'), scan:lsGet(LS.scan) };
-  if(withKey){ const k = lsGet(LS.key); if(k) p.key = k; }
-  return p;
-}
-
-function applyPayload(r, withKey){
-  if(!r || r.v!==1) throw new Error('不是有效的 DayScan 同步数据');
-  const notes = [];
-  // 额度：同一天内，各设备计数取最大值再求和
-  if(r.quota && r.quota.day === utcDay()){
-    const l = quota(), dev = {...l.dev};
-    for(const [d,n] of Object.entries(r.quota.dev||{})) dev[d] = Math.max(dev[d]||0, n);
-    lsSet(LS.quota, { day:l.day, used:0, dev }); renderQuota(); notes.push('额度');
-  }
-  // 筛选条件：谁更新谁生效
-  const lf = lsGet('dt_filters');
-  if(r.filters && r.filters.v && (!lf || r.filters.ts > lf.ts)){ setFilters(r.filters.v); lsSet('dt_filters', r.filters); notes.push('筛选条件'); }
-  // 扫描缓存：取较新的
-  const ls = lsGet(LS.scan);
-  if(r.scan && r.scan.rows && (!ls || r.scan.ts > ls.ts)){
-    lsSet(LS.scan, r.scan); notes.push('扫描缓存');
-    if(state.live){ state.raw = r.scan.rows; state.scanTs = r.scan.ts; }
-  }
-  // API Key：仅当勾选同步 Key 且本机还没有时导入
-  if(withKey && r.key && !lsGet(LS.key)){ lsSet(LS.key, r.key); notes.push('API Key'); }
-  renderScan();
-  return notes;
-}
-
-async function gh(path, opt={}){
-  const { token } = syncCfg();
-  const headers = { Accept:'application/vnd.github+json', Authorization:'Bearer '+token };
-  if(opt.body) headers['Content-Type'] = 'application/json';
-  const res = await fetch('https://api.github.com'+path, { ...opt, headers });
-  if(!res.ok){ let m = res.statusText; try{ m = (await res.json()).message || m; }catch{} throw new Error(`GitHub ${res.status}: ${m}`); }
-  return res.json();
-}
-async function findGist(){ const list = await gh('/gists?per_page=100'); const g = list.find(x => x.files && x.files[SYNC_FILE]); return g ? g.id : ''; }
-async function readGist(id){
-  const g = await gh('/gists/'+id), f = g.files && g.files[SYNC_FILE];
-  if(!f) return null;
-  const txt = f.truncated ? await (await fetch(f.raw_url)).text() : f.content;
-  return JSON.parse(txt);
-}
-
-async function syncNow(){
-  const cfg = syncCfg();
-  if(!cfg.token){ setSyncStatus('请先填写 GitHub 令牌并点「保存设置」', true); return; }
-  const btn = $('syncNow'); btn.disabled = true; setSyncStatus('同步中…');
-  try{
-    let id = cfg.gist || await findGist();
-    if(id) lsSet('dt_gist_id', id);
-    let notes = [];
-    if(id){ const remote = await readGist(id); if(remote) notes = applyPayload(remote, cfg.withKey); }   // 先拉取并合并
-    const content = JSON.stringify(buildPayload(cfg.withKey));
-    const files = { [SYNC_FILE]: { content } };
-    if(id) await gh('/gists/'+id, { method:'PATCH', body:JSON.stringify({ description:'DayScan sync data', files }) });
-    else { const g = await gh('/gists', { method:'POST', body:JSON.stringify({ description:'DayScan sync data', public:false, files }) }); id = g.id; lsSet('dt_gist_id', id); }
-    $('ghGist').value = id;
-    setSyncStatus(`同步完成 ${new Date().toLocaleTimeString()} · 从云端合并：${notes.length?notes.join('、'):'无新内容'} · 已上传本机最新数据`);
-    toast('同步完成');
-  }catch(e){ setSyncStatus('同步失败：'+e.message, true); toast('同步失败：'+e.message, 6000); }
-  finally{ btn.disabled = false; }
-}
-
-function exportJson(){
-  const blob = new Blob([JSON.stringify(buildPayload(syncCfg().withKey), null, 2)], { type:'application/json' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = 'dayscan-sync-'+new Date().toISOString().slice(0,10)+'.json';
-  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
-}
-async function importJson(file){
-  try{ const notes = applyPayload(JSON.parse(await file.text()), syncCfg().withKey); setSyncStatus('导入完成：'+(notes.length?notes.join('、'):'无新内容')); toast('导入完成'); }
-  catch(e){ setSyncStatus('导入失败：'+e.message, true); }
-}
-
-$('btnSync').onclick = () => {
-  $('syncBar').classList.toggle('hidden');
-  const c = syncCfg(); $('ghToken').value = c.token; $('ghGist').value = c.gist; $('syncWithKey').checked = c.withKey;
-};
-$('syncSaveCfg').onclick = () => {
-  lsSet('dt_gh_token', $('ghToken').value.trim()); lsSet('dt_gist_id', $('ghGist').value.trim()); lsSet('dt_sync_key', $('syncWithKey').checked);
-  setSyncStatus('设置已保存到本机'); toast('同步设置已保存');
-};
-$('syncWithKey').onchange = () => lsSet('dt_sync_key', $('syncWithKey').checked);
-$('syncNow').onclick = syncNow;
-$('syncExport').onclick = exportJson;
-$('syncImport').onclick = () => $('syncFile').click();
-$('syncFile').onchange = e => { if(e.target.files[0]) importJson(e.target.files[0]); e.target.value = ''; };
-$('syncReset').onclick = () => { ['dt_gh_token','dt_gist_id','dt_sync_key'].forEach(k=>localStorage.removeItem(k)); $('ghToken').value=''; $('ghGist').value=''; $('syncWithKey').checked=false; setSyncStatus('已断开（云端 Gist 未删除）'); };
+$('keySave').onclick = () => { lsSet(LS.key, $('keyInput').value.trim()); toast(t('keySaved')); $('keyBar').classList.add('hidden'); };
+$('keyClear').onclick = () => { localStorage.removeItem(LS.key); $('keyInput').value=''; toast(t('keyCleared')); };
 
 /* 初始化：不自动请求任何数据 */
-loadFilters(); renderQuota(); renderMode();
 if(state.live && !getKey()) state.live = false;
+applyLang();
 setMode(state.live);
 
 /* PWA：注册 Service Worker（仅 https / localhost 生效） */
