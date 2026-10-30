@@ -13,7 +13,6 @@
 <meta name="apple-mobile-web-app-title" content="DayScan">
 <title>DayScan · 美股日内交易扫描器</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
   :root { --bg:#0b0e14; --panel:#11151d; --line:#1f2633; --txt:#d5dbe6; --mute:#7a8599; --up:#26d98b; --down:#ff5c6c; --acc:#4aa3ff; }
   html,body { background:var(--bg); color:var(--txt); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
@@ -22,6 +21,9 @@
   .row { border-bottom:1px solid var(--line); cursor:pointer; transition:background .12s; }
   .row:hover { background:#161c28; }
   .row.active { background:#16243a; box-shadow: inset 3px 0 0 var(--acc); }
+  .pick { background:#0e121a; border:1px solid var(--line); border-radius:8px; cursor:pointer; transition:border-color .12s; }
+  .pick:hover { border-color:var(--acc); }
+  .pick.sel { border-color:var(--acc); box-shadow: inset 3px 0 0 var(--acc); }
   .btn { border:1px solid var(--line); background:#161c28; border-radius:6px; padding:6px 12px; font-size:12px; transition:all .12s; }
   .btn:hover { border-color:var(--acc); color:#fff; }
   .btn-primary { background:#1b4a86; border-color:#2a6bc0; color:#fff; }
@@ -33,7 +35,7 @@
   .switch { position:relative; width:42px; height:22px; background:#2a3242; border-radius:999px; cursor:pointer; transition:.2s; flex:none; }
   .switch::after { content:""; position:absolute; top:3px; left:3px; width:16px; height:16px; background:#fff; border-radius:50%; transition:.2s; }
   .switch.live { background:#c2410c; } .switch.live::after { left:23px; }
-  .badge { font-size:10px; padding:1px 6px; border-radius:4px; border:1px solid var(--line); }
+  .badge { font-size:10px; padding:1px 6px; border-radius:4px; border:1px solid var(--line); display:inline-block; }
   ::-webkit-scrollbar { width:8px; height:8px; } ::-webkit-scrollbar-thumb { background:#252d3d; border-radius:4px; }
   #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#1c2332; border:1px solid var(--line); padding:8px 16px; border-radius:8px; font-size:12px; opacity:0; pointer-events:none; transition:opacity .2s; z-index:50; max-width:90vw; }
   #toast.show { opacity:1; }
@@ -53,7 +55,7 @@
     <div class="panel px-3 py-1.5 flex items-center gap-2" data-i18n-title="quotaTip">
       <span class="mute" data-i18n="quotaLabel"></span>
       <span id="quotaText" class="font-bold">0 / 250</span>
-      <div class="w-20 h-1.5 rounded bg-[#222a39] overflow-hidden"><div id="quotaBar" class="h-full" style="width:0;background:var(--up)"></div></div>
+      <div class="w-20 h-1.5 rounded overflow-hidden" style="background:#222a39"><div id="quotaBar" class="h-full" style="width:0;background:var(--up)"></div></div>
       <span class="mute"><span data-i18n="quotaLeftLabel"></span> <b id="quotaLeft" class="text-white">250</b></span>
     </div>
 
@@ -107,10 +109,30 @@
     <div class="px-3 py-2 border-t mute text-[10px]" style="border-color:var(--line)" data-i18n="scanFoot"></div>
   </section>
 
-  <!-- 右：图表与分析 -->
+  <!-- 右：建议入手 + 风控 -->
   <section class="flex flex-col gap-3 min-w-0">
-    <div class="panel p-3">
-      <div class="flex flex-wrap items-center gap-3">
+
+    <!-- ⭐ 建议入手区 -->
+    <div class="panel p-4" id="picksCard">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h3 class="font-bold text-sm">⭐ <span data-i18n="picksTitle"></span> <span id="picksBadge" class="badge mute">0</span></h3>
+        <span class="mute text-[10px]" data-i18n="picksSub"></span>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] my-3">
+        <label><span data-i18n="pCap"></span><input id="pCap" type="number" min="1" step="50" value="1000"></label>
+        <label><span data-i18n="pRisk"></span><input id="pRisk" type="number" min="0.1" step="0.25" value="1"></label>
+        <label><span data-i18n="pStop"></span><input id="pStop" type="number" min="0.5" step="0.5" value="3"></label>
+        <label><span data-i18n="pRR"></span><input id="pRR" type="number" min="0.5" step="0.5" value="2"></label>
+      </div>
+
+      <div id="picksList" class="space-y-2"></div>
+      <div class="mute text-[10px] mt-3 leading-relaxed" data-i18n="picksDisclaimer"></div>
+    </div>
+
+    <!-- eToro 风控卡片 -->
+    <div class="panel p-4" id="riskCard">
+      <div class="flex flex-wrap items-center gap-3 mb-3">
         <div>
           <div class="flex items-baseline gap-3">
             <span id="selSym" class="text-2xl font-bold">—</span>
@@ -119,29 +141,15 @@
           </div>
           <div id="selName" class="mute text-xs"></div>
         </div>
-        <div class="ml-auto flex items-center gap-2 text-xs">
-          <span id="candleMeta" class="mute"></span>
-          <button id="btnReloadCandle" class="btn" disabled data-i18n="reloadCandle"></button>
-        </div>
-      </div>
-      <div id="legend" class="mt-2 text-[11px] mute h-4"></div>
-      <div class="relative">
-        <div id="chart" class="w-full" style="height:430px"></div>
-        <div id="chartEmpty" class="absolute inset-0 flex items-center justify-center mute text-sm text-center px-4"></div>
-      </div>
-    </div>
-
-    <!-- eToro 风控卡片 -->
-    <div class="panel p-4" id="riskCard">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <h3 class="font-bold text-sm flex items-center gap-2">
-          <span class="inline-block w-2 h-2 rounded-full" style="background:#7cc242"></span> <span data-i18n="riskTitle"></span>
-        </h3>
-        <div class="flex items-center gap-2">
+        <div class="ml-auto flex items-center gap-2">
           <span id="sessionBadge" class="badge"></span>
           <button id="btnCopy" class="btn" disabled data-i18n="copyBtn"></button>
         </div>
       </div>
+
+      <h3 class="font-bold text-sm flex items-center gap-2 mb-3">
+        <span class="inline-block w-2 h-2 rounded-full" style="background:#7cc242"></span> <span data-i18n="riskTitle"></span>
+      </h3>
 
       <div class="grid md:grid-cols-3 gap-3 text-xs">
         <div class="p-3 rounded-md" style="background:#0e121a;border:1px solid var(--line)">
@@ -157,10 +165,12 @@
         <div class="p-3 rounded-md" style="background:#0e121a;border:1px solid var(--line)">
           <div class="mute mb-1" data-i18n="refTitle"></div>
           <div class="space-y-0.5">
-            <div><span data-i18n="rkLastL"></span><b id="rkLast">—</b></div>
-            <div><span data-i18n="rkVwapL"></span><b id="rkVwap">—</b></div>
-            <div><span data-i18n="rkLimitL"></span><b id="rkLimit">—</b></div>
+            <div><span data-i18n="plEntry"></span>：<b id="rkEntry">—</b></div>
+            <div><span data-i18n="plStop"></span>：<b id="rkStop">—</b></div>
+            <div><span data-i18n="plTarget"></span>：<b id="rkTarget">—</b></div>
+            <div><span data-i18n="plSize"></span>：<b id="rkSize">—</b></div>
           </div>
+          <div id="rkRiskLine" class="mute mt-1 text-[10px]"></div>
           <div class="mute mt-1 text-[10px]" data-i18n="refNote"></div>
         </div>
       </div>
@@ -186,8 +196,9 @@ const FMP_API_KEY = 'YOUR_FMP_API_KEY';
 
 const FMP_BASE   = 'https://financialmodelingprep.com/stable';
 const DAILY_LIMIT = 250;
-const CANDLE_TTL_MS = 5 * 60 * 1000;      // K线缓存 5 分钟
-const LS = { quota:'dt_quota', mode:'dt_mode', key:'dt_key', scan:'dt_scan_cache', candle:'dt_candle_', lang:'dt_lang' };
+const TOP_N = 5;                 // 「建议入手」展示前几名
+const ENTRY_PULLBACK = 0.005;    // 挂单价 = 现价下方 0.5%（不追高）
+const LS = { quota:'dt_quota', mode:'dt_mode', key:'dt_key', scan:'dt_scan_cache', lang:'dt_lang', risk:'dt_risk' };
 
 /* =====================================================================
  *  多语言 / i18n
@@ -206,22 +217,32 @@ const I18N = {
     notLoaded:'尚未加载，请点击「手动刷新」',
     fChg:'涨幅 > %', fRvol:'RVOL >', fMin:'价格 ≥ $', fMax:'价格 ≤ $',
     filterHint:'修改筛选条件只在本地重新过滤缓存数据，不消耗 API。',
-    scanFoot:'点击股票 → 才会请求该股 5 分钟 K 线（懒加载，消耗 1 次请求）',
-    reloadCandle:'重新加载K线 (-1)',
-    chartHint:'← 从左侧选择一支股票查看 5 分钟 K 线 + VWAP',
-    chartLoading:'加载 K 线中…', chartFail:'加载失败：{msg}',
+    scanFoot:'点击股票 → 查看风控卡片与交易计划（纯本地计算，不消耗 API）',
+    picksTitle:'建议入手', picksSub:'Top 5 · 规则打分，非预测',
+    pCap:'本金 $', pRisk:'单笔风险 %', pStop:'止损幅度 %', pRR:'盈亏比 R:R',
+    picksEmpty:'暂无候选：请先点「手动刷新」，或放宽左侧筛选条件',
+    picksDisclaimer:'排序只看涨幅、RVOL、成交量、价格和交易时段，不预测涨跌，也不是投资建议。挂单价、止损、目标和仓位都由上方参数机械计算；点差、盘口和消息面请在 eToro 内自行核实。',
+    gradeStrong:'较强', gradeWatch:'可关注', gradeSkip:'观望', score:'评分',
+    plEntry:'挂单限价', plStop:'止损', plTarget:'目标', plSize:'建议仓位',
+    plUnits:'≈ {u} 股', plCapped:'（已按本金封顶，不用杠杆）',
+    plRiskLine:'最大亏损 ≈ ${risk}，到达目标 ≈ +${gain}',
+    plInvalid:'请在上方填写有效的本金、风险、止损和盈亏比',
+    rsnMomOk:'涨幅 +{v}%', rsnMomHot:'涨幅 +{v}% 过大，谨防追高', rsnMomWeak:'涨幅仅 +{v}%',
+    rsnRvolHigh:'明显放量 {v}×', rsnRvolOk:'RVOL {v}×', rsnRvolLow:'RVOL 偏低 {v}×', rsnRvolNA:'RVOL 未知',
+    rsnVolHigh:'成交活跃 {v}', rsnVolLow:'成交偏低 {v}',
+    rsnPriceLow:'低价股，点差偏宽', rsnSess:'非常规时段，点差更大', rsnLiqBad:'流动性差，评级封顶',
+    selectHint:'← 从左侧列表或「建议入手」中选择一支股票',
     riskTitle:'eToro 交易风控卡片', copyBtn:'📋 复制代码 (Ticker)',
     liqTitle:'流动性 / 预估点差',
     orderTitle:'⚠ 订单类型', orderMain:'务必使用「限价单 Limit Order」进场',
     orderDesc:'市价单在高波动小盘股上容易严重滑点；eToro 点差本身已含成本，进场价请手动设定并设置止损。',
-    refTitle:'参考价位（仅为示意）', rkLastL:'现价：', rkVwapL:'VWAP：', rkLimitL:'参考限价区间：',
-    refNote:'区间 = 现价与 VWAP 之间的回踩区，非投资建议。',
-    rkVwapNone:'—（加载K线后显示）',
+    refTitle:'参考交易计划（机械计算）',
+    refNote:'挂单价 = 现价下方 0.5% 的回踩价；其余由「建议入手」区的参数计算，非投资建议。',
     tip1:'盘前 / 盘后及开盘前几分钟，eToro 点差可能明显拉大，成交价会偏离图表价格。',
     tip2:'eToro 对美股通常以其做市价格执行，且可能有非交易时段限制，请以平台内实际报价为准。',
     tip3:'日内交易亏损风险高；合理设置止损，避免杠杆放大损失。',
     sessWeekend:'休市（周末）', sessPre:'盘前 Pre-Market', sessOpen:'开盘后15分钟', sessRegular:'盘中 Regular', sessAfter:'盘后 After-Hours', sessClosed:'休市',
-    liqBad:'较差 · 点差可能很宽', liqBadNote:'低流动性/高波动，eToro 实际成交价可能明显偏离图表价格。建议减小仓位或放弃。',
+    liqBad:'较差 · 点差可能很宽', liqBadNote:'低流动性/高波动，eToro 实际成交价可能明显偏离报价。建议减小仓位或放弃。',
     liqMid:'一般 · 点差可能拉大', liqMidNote:'点差在波动加剧时容易扩大，进场前务必先看 eToro 内实时买卖价。',
     liqGood:'较好 · 点差相对可控', liqGoodNote:'仍请在 eToro 内核对实时点差；消息驱动行情中点差会瞬间变宽。',
     offHours:' 当前处于非常规/开盘时段，点差风险更高。',
@@ -229,17 +250,14 @@ const I18N = {
     scanMeta:'{tag} · 更新于 {time}（{ago}）· 共 {n} 条原始记录',
     justNow:'刚刚', minsAgo:'{m} 分钟前',
     noMatch:'没有符合当前筛选条件的股票', noData:'暂无数据', rvolNA:'未知',
-    candleMeta:'{n} 根 · {src}', srcMock:'模拟', srcCache:'缓存 {m} 分钟前', srcApi:'实时拉取',
     errNoKey:'未设置 FMP API Key（点击右上角 🔑 API Key 或修改代码常量）',
     errQuota:'本地估算今日额度已用完（250），已阻止请求',
     refreshed:'已刷新真实数据', mockToast:'测试模式：使用模拟数据（不消耗额度）',
     refreshFail:'刷新失败：{msg}',
     confirmRefresh:'本次刷新约消耗 3 次 API 请求（今日已用 {used}/{limit}）。继续？',
     batchFail:'批量报价获取失败（免费版可能不支持 batch-quote），RVOL 将显示为未知：{msg}',
-    noBars:'没有返回K线数据（休市或该股暂无5分钟数据）', candleFail:'K线加载失败：{msg}',
     copied:'已复制 {sym}，到 eToro 搜索栏粘贴即可',
     needKey:'请先设置 FMP API Key 再切换到真实模式', loadedCache:'已载入上次缓存数据（未消耗额度）',
-    confirmReload:'重新加载将消耗 1 次 API 请求，继续？',
     keySaved:'API Key 已保存到本机浏览器', keyCleared:'已清除本机保存的 Key'
   },
   en: {
@@ -254,22 +272,32 @@ const I18N = {
     notLoaded:'Not loaded yet — click "Refresh Data"',
     fChg:'Change > %', fRvol:'RVOL >', fMin:'Price ≥ $', fMax:'Price ≤ $',
     filterHint:'Changing filters only re-filters cached data locally — no API calls.',
-    scanFoot:'Click a stock → only then its 5-min candles are requested (lazy load, 1 request)',
-    reloadCandle:'Reload candles (-1)',
-    chartHint:'← Pick a stock on the left to see 5-min candles + VWAP',
-    chartLoading:'Loading candles…', chartFail:'Failed to load: {msg}',
+    scanFoot:'Click a stock → see its risk card and trade plan (computed locally, no API call)',
+    picksTitle:'Suggested Entries', picksSub:'Top 5 · rule-based score, not a forecast',
+    pCap:'Capital $', pRisk:'Risk per trade %', pStop:'Stop distance %', pRR:'Reward : Risk',
+    picksEmpty:'No candidates yet — click "Refresh Data" or loosen the filters on the left',
+    picksDisclaimer:'Ranking only looks at change %, RVOL, volume, price and trading session. It does not predict direction and is not investment advice. Entry, stop, target and position size are computed mechanically from the inputs above; verify spread, order book and news inside eToro yourself.',
+    gradeStrong:'Strong', gradeWatch:'Watch', gradeSkip:'Skip', score:'Score',
+    plEntry:'Limit entry', plStop:'Stop', plTarget:'Target', plSize:'Position',
+    plUnits:'≈ {u} sh', plCapped:'(capped at capital, no leverage)',
+    plRiskLine:'Max loss ≈ ${risk}, gain at target ≈ +${gain}',
+    plInvalid:'Enter valid capital, risk, stop and R:R above',
+    rsnMomOk:'Up +{v}%', rsnMomHot:'Up +{v}% — overextended, beware chasing', rsnMomWeak:'Only +{v}%',
+    rsnRvolHigh:'Heavy volume {v}×', rsnRvolOk:'RVOL {v}×', rsnRvolLow:'RVOL low {v}×', rsnRvolNA:'RVOL N/A',
+    rsnVolHigh:'Active volume {v}', rsnVolLow:'Thin volume {v}',
+    rsnPriceLow:'Low-priced, wider spread', rsnSess:'Off-hours, wider spread', rsnLiqBad:'Poor liquidity — grade capped',
+    selectHint:'← Pick a stock from the list or Suggested Entries',
     riskTitle:'eToro Risk Card', copyBtn:'📋 Copy Ticker',
     liqTitle:'Liquidity / Est. Spread',
     orderTitle:'⚠ Order Type', orderMain:'Always enter with a Limit Order',
     orderDesc:"Market orders can slip badly on volatile small caps. eToro's spread is already a cost, so set your entry price manually and use a stop loss.",
-    refTitle:'Reference Prices (illustrative)', rkLastL:'Last: ', rkVwapL:'VWAP: ', rkLimitL:'Limit zone: ',
-    refNote:'Zone = pullback area between last price and VWAP. Not investment advice.',
-    rkVwapNone:'— (shown after candles load)',
-    tip1:'In pre-market, after-hours and the first minutes after the open, eToro spreads can widen a lot and fills may differ from chart prices.',
+    refTitle:'Reference Trade Plan (mechanical)',
+    refNote:'Entry = 0.5% below last price; the rest follow the inputs in Suggested Entries. Not investment advice.',
+    tip1:'In pre-market, after-hours and the first minutes after the open, eToro spreads can widen a lot and fills may differ from quoted prices.',
     tip2:"eToro usually executes US stocks at its own market-maker prices and may restrict off-hours trading — always rely on the quote inside the platform.",
     tip3:'Day trading carries a high risk of loss. Use a sensible stop loss and avoid leverage magnifying losses.',
     sessWeekend:'Closed (weekend)', sessPre:'Pre-Market', sessOpen:'First 15 min after open', sessRegular:'Regular Session', sessAfter:'After-Hours', sessClosed:'Closed',
-    liqBad:'Poor · spread may be wide', liqBadNote:'Low liquidity / high volatility — your eToro fill may differ a lot from the chart price. Consider a smaller size or skipping it.',
+    liqBad:'Poor · spread may be wide', liqBadNote:'Low liquidity / high volatility — your eToro fill may differ a lot from the quote. Consider a smaller size or skipping it.',
     liqMid:'Fair · spread may widen', liqMidNote:'Spreads tend to widen as volatility rises. Check the live bid/ask inside eToro before entering.',
     liqGood:'Good · spread fairly contained', liqGoodNote:'Still verify the live spread in eToro; on news-driven moves spreads can widen instantly.',
     offHours:' Currently outside regular hours or right after the open — spread risk is higher.',
@@ -277,17 +305,14 @@ const I18N = {
     scanMeta:'{tag} · Updated {time} ({ago}) · {n} raw records',
     justNow:'just now', minsAgo:'{m} min ago',
     noMatch:'No stocks match the current filters', noData:'No data', rvolNA:'N/A',
-    candleMeta:'{n} bars · {src}', srcMock:'mock', srcCache:'cached {m} min ago', srcApi:'fetched live',
     errNoKey:'FMP API Key not set (click 🔑 API Key at top right, or edit the constant in code)',
     errQuota:"Local estimate says today's quota (250) is used up; request blocked",
     refreshed:'Live data refreshed', mockToast:'Test mode: using mock data (no quota used)',
     refreshFail:'Refresh failed: {msg}',
     confirmRefresh:'This refresh uses about 3 API requests (used today: {used}/{limit}). Continue?',
     batchFail:'Batch quote failed (the free plan may not support batch-quote); RVOL will show as N/A: {msg}',
-    noBars:'No candle data returned (market closed, or no 5-min data for this stock)', candleFail:'Candle load failed: {msg}',
     copied:'Copied {sym} — paste it into the eToro search bar',
     needKey:'Set your FMP API Key before switching to live mode', loadedCache:'Loaded last cached data (no quota used)',
-    confirmReload:'Reloading will use 1 API request. Continue?',
     keySaved:'API Key saved in this browser', keyCleared:'Saved key cleared'
   }
 };
@@ -308,23 +333,22 @@ const locale = () => LANG==='zh' ? 'zh-CN' : 'en-US';
 const $ = id => document.getElementById(id);
 const fmt = (n, d=2) => (n==null||isNaN(n)) ? '—' : Number(n).toFixed(d);
 const fmtVol = v => v==null ? '—' : v>=1e6 ? (v/1e6).toFixed(2)+'M' : v>=1e3 ? (v/1e3).toFixed(0)+'K' : String(v);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const lsGet = (k, def=null) => { try { const v = localStorage.getItem(k); return v==null?def:JSON.parse(v); } catch { return def; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} };
 const utcDay = () => new Date().toISOString().slice(0,10);
 function toast(msg, ms=3200){ const el=$('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'), ms); }
 function getKey(){ return (lsGet(LS.key) || (FMP_API_KEY==='YOUR_FMP_API_KEY' ? '' : FMP_API_KEY) || '').trim(); }
 
+/* 清理旧版本遗留的 K 线缓存 */
+try { Object.keys(localStorage).filter(k => k.startsWith('dt_candle_')).forEach(k => localStorage.removeItem(k)); } catch(e){}
+
 /* ---------------------------- 状态 ---------------------------- */
 const state = {
   live: lsGet(LS.mode, false) === true,   // 默认 false = 测试模式
   raw: [],            // 扫描原始数据（未过滤）
   scanTs: null,
-  selected: null,
-  chart: null, candleSeries: null, vwapSeries: null, volSeries: null,
-  bars: [], vwap: [],
-  empty: { key:'chartHint' },   // 图表遮罩提示（可随语言重新渲染）
-  candleInfo: null,            // { n, from, ts }
-  riskLive: null               // { last, vwap }
+  selected: null
 };
 
 /* ---------------------------- API 额度计数 ---------------------------- */
@@ -360,9 +384,6 @@ async function fmp(path, params={}){
 /* =====================================================================
  *  模拟数据（Mock）
  * ===================================================================== */
-function hashSeed(s){ let h=2166136261; for(const c of s){ h^=c.charCodeAt(0); h=Math.imul(h,16777619);} return h>>>0; }
-function rng(seed){ let a=seed; return ()=>{ a|=0; a=a+0x6D2B79F5|0; let x=Math.imul(a^a>>>15,1|a); x=x+Math.imul(x^x>>>7,61|x)^x; return ((x^x>>>14)>>>0)/4294967296; }; }
-
 const MOCK_SCAN = [
   ['SMCX','Summit Micro Devices',4.82,18.4,1480000,210000],
   ['NVLA','Novella Therapeutics',12.35,9.7,5200000,1100000],
@@ -378,25 +399,8 @@ const MOCK_SCAN = [
   ['PNNY','Penny Labs',0.62,25.0,31000000,2500000]         // 价格<1 / price < $1
 ].map(([symbol,name,price,chg,volume,avgVolume])=>({symbol,name,price,changePct:chg,volume,avgVolume,rvol:+(volume/avgVolume).toFixed(2)}));
 
-function mockCandles(sym, lastPrice, changePct){
-  const rand = rng(hashSeed(sym)), n = 78;
-  const etDate = new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York'}).format(new Date());
-  const start = Date.parse(etDate+'T09:30:00Z')/1000;     // 把 ET 时钟当作 UTC 展示
-  const prevClose = lastPrice/(1+changePct/100);
-  let p = prevClose*(1+changePct/100*0.35), walk=[];
-  for(let i=0;i<n;i++){
-    const drift = (changePct/100*0.65)/n;
-    const o = p, c = o*(1+drift+(rand()-0.5)*0.012);
-    const h = Math.max(o,c)*(1+rand()*0.006), l = Math.min(o,c)*(1-rand()*0.006);
-    const v = Math.round((i<6?3:1)*(40000+rand()*90000)*(1+(rand()>0.9?3:0)));
-    walk.push({o,h,l,c,v}); p=c;
-  }
-  const k = lastPrice / walk[n-1].c;
-  return walk.map((b,i)=>({ time:start+i*300, open:+(b.o*k).toFixed(4), high:+(b.h*k).toFixed(4), low:+(b.l*k).toFixed(4), close:+(b.c*k).toFixed(4), volume:b.v }));
-}
-
 /* =====================================================================
- *  扫描数据加载
+ *  扫描数据加载（每次刷新 ≈ 3 次请求；选股与评分均为本地计算）
  * ===================================================================== */
 const num = v => (v==null||v==='') ? null : Number(v);
 
@@ -447,10 +451,14 @@ async function refreshScan(){
       toast(t('mockToast'));
     }
   }catch(e){ toast(t('refreshFail',{msg:e.message}), 6000); }
-  finally{ btn.disabled=false; btn.textContent=t('refresh'); renderScan(); }
+  finally{
+    btn.disabled=false; btn.textContent=t('refresh');
+    if(state.selected){ const f = state.raw.find(r=>r.symbol===state.selected.symbol); if(f) state.selected = f; }
+    renderAll();
+  }
 }
 
-/* ---------------------------- 渲染扫描列表 ---------------------------- */
+/* ---------------------------- 筛选 + 左侧列表 ---------------------------- */
 function passFilter(r){
   const fChg=+$('fChg').value, fRvol=+$('fRvol').value, fMin=+$('fMin').value, fMax=+$('fMax').value;
   return r.price>=fMin && r.price<=fMax && r.changePct>fChg && (r.rvol==null || r.rvol>fRvol);
@@ -470,13 +478,13 @@ function renderScan(){
   const list = $('scanList');
   if(!rows.length){ list.innerHTML = `<div class="p-6 text-center mute text-xs">${state.raw.length ? t('noMatch') : t('noData')}</div>`; return; }
   list.innerHTML = rows.map(r => `
-    <div class="row px-3 py-2.5 ${state.selected?.symbol===r.symbol?'active':''}" data-sym="${r.symbol}">
+    <div class="row px-3 py-2.5 ${state.selected?.symbol===r.symbol?'active':''}" data-sym="${esc(r.symbol)}">
       <div class="flex items-center justify-between">
-        <span class="font-bold">${r.symbol}</span>
+        <span class="font-bold">${esc(r.symbol)}</span>
         <span class="up font-bold">+${fmt(r.changePct)}%</span>
       </div>
       <div class="flex items-center justify-between text-[11px] mute mt-0.5">
-        <span class="truncate max-w-[160px]">${r.name||''}</span>
+        <span class="truncate max-w-[160px]">${esc(r.name)}</span>
         <span>$${fmt(r.price)}</span>
       </div>
       <div class="flex items-center gap-2 text-[11px] mt-1">
@@ -488,105 +496,7 @@ function renderScan(){
 }
 
 /* =====================================================================
- *  K线（懒加载）
- * ===================================================================== */
-function setEmpty(key, vars){ state.empty = key ? { key, vars } : null; renderChartEmpty(); }
-function renderChartEmpty(){
-  const el = $('chartEmpty');
-  if(state.empty){ el.textContent = t(state.empty.key, state.empty.vars); el.style.display = 'flex'; }
-  else el.style.display = 'none';
-}
-function renderCandleMeta(){
-  const ci = state.candleInfo, el = $('candleMeta');
-  if(!ci){ el.textContent = ''; return; }
-  const src = ci.from==='mock' ? t('srcMock') : ci.from==='cache' ? t('srcCache',{m:Math.round((Date.now()-ci.ts)/60000)}) : t('srcApi');
-  el.textContent = t('candleMeta',{n:ci.n, src});
-}
-
-function ensureChart(){
-  if(state.chart) return;
-  const el = $('chart');
-  state.chart = LightweightCharts.createChart(el, {
-    layout:{ background:{type:'solid',color:'#11151d'}, textColor:'#9aa4b8', fontFamily:'ui-monospace, monospace' },
-    grid:{ vertLines:{color:'#1a2130'}, horzLines:{color:'#1a2130'} },
-    crosshair:{ mode:0 },
-    rightPriceScale:{ borderColor:'#1f2633' },
-    timeScale:{ borderColor:'#1f2633', timeVisible:true, secondsVisible:false },
-    width: el.clientWidth, height: 430
-  });
-  state.candleSeries = state.chart.addCandlestickSeries({ upColor:'#26d98b', downColor:'#ff5c6c', borderVisible:false, wickUpColor:'#26d98b', wickDownColor:'#ff5c6c' });
-  state.vwapSeries = state.chart.addLineSeries({ color:'#f5a524', lineWidth:2, priceLineVisible:false, lastValueVisible:true, title:'VWAP' });
-  state.volSeries = state.chart.addHistogramSeries({ priceFormat:{type:'volume'}, priceScaleId:'vol' });
-  state.chart.priceScale('vol').applyOptions({ scaleMargins:{ top:0.82, bottom:0 } });
-  state.chart.subscribeCrosshairMove(p => {
-    const c = p.seriesData && p.seriesData.get(state.candleSeries), v = p.seriesData && p.seriesData.get(state.vwapSeries);
-    $('legend').innerHTML = c ? `O ${fmt(c.open)} H ${fmt(c.high)} L ${fmt(c.low)} C ${fmt(c.close)} ${v?` · <span style="color:#f5a524">VWAP ${fmt(v.value)}</span>`:''}` : '';
-  });
-  new ResizeObserver(()=> state.chart.applyOptions({ width: el.clientWidth })).observe(el);
-}
-
-function parseFmpBars(rows){
-  // FMP 返回倒序、含多日；取最新交易日并转升序。时间字符串为美东时间，按 UTC 渲染以便图上显示 ET 时钟
-  if(!rows || !rows.length) return [];
-  const latest = rows[0].date.slice(0,10);
-  return rows.filter(r => r.date.startsWith(latest)).reverse().map(r => ({
-    time: Date.parse(r.date.replace(' ','T')+'Z')/1000,
-    open:+r.open, high:+r.high, low:+r.low, close:+r.close, volume:+r.volume
-  }));
-}
-
-function calcVWAP(bars){
-  let pv=0, vv=0;
-  return bars.map(b => { const tp=(b.high+b.low+b.close)/3; pv+=tp*b.volume; vv+=b.volume; return { time:b.time, value: vv? +(pv/vv).toFixed(4) : b.close }; });
-}
-
-async function getCandles(sym, force=false){
-  const stock = state.raw.find(r=>r.symbol===sym);
-  if(!state.live) return { bars: mockCandles(sym, stock.price, stock.changePct), from:'mock' };
-  const ck = LS.candle+sym, cached = lsGet(ck);
-  if(!force && cached && Date.now()-cached.ts < CANDLE_TTL_MS) return { bars:cached.bars, from:'cache', ts:cached.ts };
-  const rows = await fmp('/historical-chart/5min', { symbol:sym });    // 1 次请求
-  const bars = parseFmpBars(rows);
-  lsSet(ck, { ts:Date.now(), bars });
-  return { bars, from:'api', ts:Date.now() };
-}
-
-async function selectStock(sym, force=false){
-  const stock = state.raw.find(r=>r.symbol===sym); if(!stock) return;
-  state.selected = stock; state.riskLive = null; state.candleInfo = null;
-  renderScan(); renderHeader(stock); updateRisk(stock, null); renderCandleMeta();
-  setEmpty('chartLoading');
-  $('btnCopy').disabled = false; $('btnReloadCandle').disabled = false;
-  try{
-    const { bars, from, ts } = await getCandles(sym, force);
-    if(state.selected?.symbol !== sym) return;           // 用户已切换
-    if(!bars.length) throw new Error(t('noBars'));
-    ensureChart();
-    state.bars = bars; state.vwap = calcVWAP(bars);
-    state.candleSeries.setData(bars.map(({time,open,high,low,close})=>({time,open,high,low,close})));
-    state.vwapSeries.setData(state.vwap);
-    state.volSeries.setData(bars.map(b=>({ time:b.time, value:b.volume, color: b.close>=b.open ? 'rgba(38,217,139,.35)' : 'rgba(255,92,108,.35)' })));
-    state.chart.timeScale().fitContent();
-    setEmpty(null);
-    state.candleInfo = { n:bars.length, from, ts };
-    renderCandleMeta();
-    state.riskLive = { last: bars[bars.length-1].close, vwap: state.vwap[state.vwap.length-1].value };
-    updateRisk(stock, state.riskLive);
-  }catch(e){
-    setEmpty('chartFail', {msg:e.message});
-    toast(t('candleFail',{msg:e.message}), 6000);
-  }
-}
-
-function renderHeader(s){
-  $('selSym').textContent = s.symbol;
-  $('selPrice').textContent = '$'+fmt(s.price);
-  $('selChg').innerHTML = `<span class="${s.changePct>=0?'up':'down'}">${s.changePct>=0?'+':''}${fmt(s.changePct)}%</span>`;
-  $('selName').textContent = s.name + (s.rvol!=null ? ` · RVOL ${fmt(s.rvol,1)}x` : '');
-}
-
-/* =====================================================================
- *  eToro 风控卡片
+ *  交易时段 / 流动性 / 评分 / 交易计划
  * ===================================================================== */
 function etSession(){
   const p = new Intl.DateTimeFormat('en-US',{ timeZone:'America/New_York', weekday:'short', hour:'2-digit', minute:'2-digit', hour12:false }).formatToParts(new Date());
@@ -598,11 +508,7 @@ function etSession(){
   if(m>=960 && m<1200) return { key:'after',  label:t('sessAfter'),   color:'#f5a524' };
   return { key:'closed', label:t('sessClosed'), color:'#7a8599' };
 }
-function renderSession(){
-  const ses = etSession(), sb = $('sessionBadge');
-  sb.textContent = ses.label; sb.style.color = ses.color; sb.style.borderColor = ses.color;
-  return ses;
-}
+const isOffHours = ses => ['pre','after','open'].includes(ses.key);
 
 function liquidityEstimate(s, ses){
   // 经验性启发式：低价股、低成交量、非常规时段 → 点差更大。并非真实报价点差。
@@ -611,32 +517,160 @@ function liquidityEstimate(s, ses){
   if(s.volume != null){ if(s.volume < 500000) score += 2; else if(s.volume < 2000000) score += 1; }
   if(s.rvol != null && s.rvol > 8) score += 1;                     // 极端放量常伴随点差剧烈波动
   if(Math.abs(s.changePct) > 15) score += 1;
-  if(['pre','after','open'].includes(ses.key)) score += 2;
+  if(isOffHours(ses)) score += 2;
   if(ses.key==='closed') score += 1;
-  if(score >= 5) return { lv:t('liqBad'),  color:'var(--down)', note:t('liqBadNote') };
-  if(score >= 3) return { lv:t('liqMid'),  color:'#f5a524',     note:t('liqMidNote') };
-  return               { lv:t('liqGood'), color:'var(--up)',   note:t('liqGoodNote') };
+  if(score >= 5) return { lvl:'bad',  lv:t('liqBad'),  color:'var(--down)', note:t('liqBadNote') };
+  if(score >= 3) return { lvl:'mid',  lv:t('liqMid'),  color:'#f5a524',     note:t('liqMidNote') };
+  return               { lvl:'good', lv:t('liqGood'), color:'var(--up)',   note:t('liqGoodNote') };
 }
 
-function updateRisk(s, live){
-  const ses = renderSession();
-  if(!s) return;
+/* 规则打分（0–100）：涨幅 35 + RVOL 30 + 成交量 20 + 价格区间 10，归一化后扣除时段惩罚 */
+function scoreStock(s, ses){
+  const c = s.changePct, r = s.rvol, v = s.volume, p = s.price;
+  const mom = c<3 ? 0 : c<=12 ? 15+20*(c-3)/9 : c<=20 ? 35-15*(c-12)/8 : Math.max(0, 20-(c-20));
+  const rv  = r==null ? 10 : r<2 ? 0 : Math.min(30, 15+15*(r-2)/4);
+  const vol = v==null ? 8 : v>=5e6 ? 20 : v>=2e6 ? 14+6*(v-2e6)/3e6 : v>=5e5 ? 6+8*(v-5e5)/1.5e6 : 6*v/5e5;
+  const pr  = (p>=3 && p<=30) ? 10 : (p>30 && p<=50) ? 7 : (p>=1 && p<3) ? 4 : 0;
+  const pen = isOffHours(ses) ? 8 : ses.key==='closed' ? 3 : 0;
+  const score = Math.round(Math.max(0, Math.min(100, (mom+rv+vol+pr)/95*100 - pen)));
+  const liq = liquidityEstimate(s, ses);
+  let grade = score>=70 ? 'strong' : score>=50 ? 'watch' : 'skip';
+  if(liq.lvl==='bad') grade = 'skip';
+
+  const reasons = [];
+  if(c>20) reasons.push({tone:'bad',  txt:t('rsnMomHot',{v:fmt(c,1)})});
+  else if(c>=3) reasons.push({tone:'good', txt:t('rsnMomOk',{v:fmt(c,1)})});
+  else reasons.push({tone:'warn', txt:t('rsnMomWeak',{v:fmt(c,1)})});
+  if(r==null) reasons.push({tone:'warn', txt:t('rsnRvolNA')});
+  else if(r>=3) reasons.push({tone:'good', txt:t('rsnRvolHigh',{v:fmt(r,1)})});
+  else if(r>=2) reasons.push({tone:'neutral', txt:t('rsnRvolOk',{v:fmt(r,1)})});
+  else reasons.push({tone:'warn', txt:t('rsnRvolLow',{v:fmt(r,1)})});
+  if(v!=null){
+    if(v>=2e6) reasons.push({tone:'good', txt:t('rsnVolHigh',{v:fmtVol(v)})});
+    else if(v<5e5) reasons.push({tone:'warn', txt:t('rsnVolLow',{v:fmtVol(v)})});
+  }
+  if(p<3) reasons.push({tone:'warn', txt:t('rsnPriceLow')});
+  if(isOffHours(ses)) reasons.push({tone:'warn', txt:t('rsnSess')});
+  if(liq.lvl==='bad') reasons.push({tone:'bad', txt:t('rsnLiqBad')});
+  return { score, grade, reasons, liq };
+}
+
+/* 风险参数（本金/单笔风险/止损幅度/盈亏比），保存在本机 */
+function loadRiskInputs(){
+  const d = lsGet(LS.risk, null); if(!d) return;
+  if(d.cap!=null) $('pCap').value = d.cap; if(d.risk!=null) $('pRisk').value = d.risk;
+  if(d.stop!=null) $('pStop').value = d.stop; if(d.rr!=null) $('pRR').value = d.rr;
+}
+function saveRiskInputs(){ lsSet(LS.risk, { cap:$('pCap').value, risk:$('pRisk').value, stop:$('pStop').value, rr:$('pRR').value }); }
+
+function tradePlan(s){
+  const cap=+$('pCap').value, risk=+$('pRisk').value, stop=+$('pStop').value, rr=+$('pRR').value;
+  if(!(cap>0 && risk>0 && stop>0 && rr>0)) return { valid:false };
+  const entry = s.price*(1-ENTRY_PULLBACK);
+  const stopPx = entry*(1-stop/100), target = entry*(1+stop*rr/100);
+  let pos = (cap*risk/100)/(stop/100), capped = false;
+  if(pos>cap){ pos = cap; capped = true; }
+  return { valid:true, entry, stopPx, target, pos, capped, units:pos/entry, riskUsd:pos*stop/100, gainUsd:pos*stop*rr/100 };
+}
+const usd = n => '$'+Number(n).toFixed(2);
+
+/* =====================================================================
+ *  ⭐ 建议入手区
+ * ===================================================================== */
+const TONE = { good:'#26d98b', warn:'#f5a524', bad:'#ff5c6c', neutral:'#7a8599' };
+
+function renderPicks(){
+  const ses = etSession();
+  const rows = state.raw.filter(passFilter).map(s => ({ s, ...scoreStock(s, ses) })).sort((a,b)=>b.score-a.score).slice(0, TOP_N);
+  $('picksBadge').textContent = rows.length;
+  const box = $('picksList');
+  if(!rows.length){ box.innerHTML = `<div class="p-4 text-center mute text-xs">${t('picksEmpty')}</div>`; return; }
+  const G = { strong:{txt:t('gradeStrong'),color:'#26d98b'}, watch:{txt:t('gradeWatch'),color:'#f5a524'}, skip:{txt:t('gradeSkip'),color:'#7a8599'} };
+  box.innerHTML = rows.map((r,i) => {
+    const s = r.s, g = G[r.grade], pl = tradePlan(s);
+    const chips = r.reasons.map(x => `<span class="badge" style="color:${TONE[x.tone]};border-color:${TONE[x.tone]}55">${esc(x.txt)}</span>`).join(' ');
+    const plan = pl.valid ? `
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] mt-2">
+        <div><div class="mute">${t('plEntry')}</div><b>${usd(pl.entry)}</b></div>
+        <div><div class="mute">${t('plStop')}</div><b class="down">${usd(pl.stopPx)}</b></div>
+        <div><div class="mute">${t('plTarget')}</div><b class="up">${usd(pl.target)}</b></div>
+        <div><div class="mute">${t('plSize')}</div><b>$${Math.round(pl.pos)}</b> <span class="mute">${t('plUnits',{u:fmt(pl.units,2)})}</span></div>
+      </div>
+      <div class="mute text-[10px] mt-1">${t('plRiskLine',{risk:fmt(pl.riskUsd,2), gain:fmt(pl.gainUsd,2)})} ${pl.capped?t('plCapped'):''}</div>`
+      : `<div class="mute text-[11px] mt-2">${t('plInvalid')}</div>`;
+    return `
+    <div class="pick p-3 ${state.selected?.symbol===s.symbol?'sel':''}" data-sym="${esc(s.symbol)}">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-baseline gap-2">
+          <span class="mute text-xs">#${i+1}</span>
+          <b class="text-base">${esc(s.symbol)}</b>
+          <span class="up text-xs font-bold">+${fmt(s.changePct)}%</span>
+          <span class="mute text-xs">$${fmt(s.price)}</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="badge" style="color:${g.color};border-color:${g.color}66">${g.txt}</span>
+          <span class="text-xs mute">${t('score')} <b style="color:${g.color}">${r.score}</b></span>
+          <button class="btn pcopy" style="padding:2px 8px" data-sym="${esc(s.symbol)}">📋</button>
+        </div>
+      </div>
+      <div class="mute text-[11px] truncate">${esc(s.name)}</div>
+      <div class="h-1 rounded mt-2 overflow-hidden" style="background:#222a39"><div class="h-full" style="width:${r.score}%;background:${g.color}"></div></div>
+      <div class="flex flex-wrap gap-1 mt-2">${chips}</div>
+      ${plan}
+    </div>`;
+  }).join('');
+  box.querySelectorAll('.pick').forEach(el => el.onclick = () => selectStock(el.dataset.sym, true));
+  box.querySelectorAll('.pcopy').forEach(b => b.onclick = e => { e.stopPropagation(); copySym(b.dataset.sym); });
+}
+
+/* =====================================================================
+ *  选中股票 + eToro 风控卡片（纯本地，不请求 API）
+ * ===================================================================== */
+function selectStock(sym, scroll=false){
+  const stock = state.raw.find(r=>r.symbol===sym); if(!stock) return;
+  state.selected = stock;
+  renderScan(); renderPicks(); renderSelected();
+  $('btnCopy').disabled = false;
+  if(scroll && window.matchMedia('(max-width:1023px)').matches) $('riskCard').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function renderSession(){
+  const ses = etSession(), sb = $('sessionBadge');
+  sb.textContent = ses.label; sb.style.color = ses.color; sb.style.borderColor = ses.color;
+  return ses;
+}
+
+function renderSelected(){
+  const s = state.selected, ses = renderSession();
+  if(!s){
+    $('selSym').textContent = '—'; $('selPrice').textContent = ''; $('selChg').textContent = '';
+    $('selName').textContent = t('selectHint');
+    ['liqLevel','rkEntry','rkStop','rkTarget','rkSize'].forEach(id => { $(id).textContent = '—'; });
+    $('liqLevel').style.color = ''; $('liqNote').textContent = ''; $('rkRiskLine').textContent = '';
+    $('btnCopy').disabled = true;
+    return;
+  }
+  $('selSym').textContent = s.symbol;
+  $('selPrice').textContent = '$'+fmt(s.price);
+  $('selChg').innerHTML = `<span class="${s.changePct>=0?'up':'down'}">${s.changePct>=0?'+':''}${fmt(s.changePct)}%</span>`;
+  $('selName').textContent = s.name + (s.rvol!=null ? ` · RVOL ${fmt(s.rvol,1)}x` : '');
   const est = liquidityEstimate(s, ses);
   $('liqLevel').textContent = est.lv; $('liqLevel').style.color = est.color;
-  $('liqNote').textContent = est.note + (['pre','after','open'].includes(ses.key) ? t('offHours') : '');
-  const last = live?.last ?? s.price, vwap = live?.vwap;
-  $('rkLast').textContent = '$'+fmt(last);
-  $('rkVwap').textContent = vwap!=null ? '$'+fmt(vwap) : t('rkVwapNone');
-  if(vwap!=null){
-    const lo = Math.min(last, vwap), hi = Math.max(last, vwap);
-    $('rkLimit').textContent = Math.abs(hi-lo)/last < 0.002 ? `≈ $${fmt(last)}` : `$${fmt(lo)} – $${fmt(hi)}`;
-  } else $('rkLimit').textContent = '—';
+  $('liqNote').textContent = est.note + (isOffHours(ses) ? t('offHours') : '');
+  const pl = tradePlan(s);
+  if(pl.valid){
+    $('rkEntry').textContent = usd(pl.entry); $('rkStop').textContent = usd(pl.stopPx); $('rkTarget').textContent = usd(pl.target);
+    $('rkSize').textContent = `$${Math.round(pl.pos)} (${t('plUnits',{u:fmt(pl.units,2)})})`;
+    $('rkRiskLine').textContent = t('plRiskLine',{risk:fmt(pl.riskUsd,2), gain:fmt(pl.gainUsd,2)}) + (pl.capped ? ' ' + t('plCapped') : '');
+  } else {
+    ['rkEntry','rkStop','rkTarget','rkSize'].forEach(id => { $(id).textContent = '—'; });
+    $('rkRiskLine').textContent = t('plInvalid');
+  }
 }
 
 /* ---------------------------- 复制 Ticker ---------------------------- */
-async function copyTicker(){
-  if(!state.selected) return;
-  const sym = state.selected.symbol;
+async function copySym(sym){
+  if(!sym) return;
   try{ await navigator.clipboard.writeText(sym); }
   catch{ const ta=document.createElement('textarea'); ta.value=sym; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
   toast(t('copied',{sym}));
@@ -645,6 +679,8 @@ async function copyTicker(){
 /* =====================================================================
  *  模式切换 / Key 设置 / 语言切换 / 初始化
  * ===================================================================== */
+function renderAll(){ renderScan(); renderPicks(); renderSelected(); }
+
 function renderMode(){
   $('modeSwitch').classList.toggle('live', state.live);
   $('modeMock').className = state.live ? 'mute' : 'font-bold';
@@ -655,19 +691,14 @@ function renderMode(){
 function setMode(live){
   if(live && !getKey()){ toast(t('needKey'), 4500); $('keyBar').classList.remove('hidden'); return; }
   state.live = live; lsSet(LS.mode, live); renderMode();
-  state.raw = []; state.scanTs = null; state.selected = null; state.riskLive = null; state.candleInfo = null;
-  $('selSym').textContent='—'; $('selPrice').textContent=''; $('selChg').textContent=''; $('selName').textContent='';
-  $('btnCopy').disabled = true; $('btnReloadCandle').disabled = true;
-  ['liqLevel','rkLast','rkVwap','rkLimit'].forEach(id => { $(id).textContent='—'; }); $('liqNote').textContent='';
-  if(state.candleSeries){ state.candleSeries.setData([]); state.vwapSeries.setData([]); state.volSeries.setData([]); }
-  setEmpty('chartHint'); renderCandleMeta();
+  state.raw = []; state.scanTs = null; state.selected = null;
   if(live){
     const c = lsGet(LS.scan);                    // 真实模式：先展示上次缓存，不自动请求
     if(c && c.rows){ state.raw = c.rows; state.scanTs = c.ts; toast(t('loadedCache')); }
   } else {
     state.raw = MOCK_SCAN.map(r=>({...r})); state.scanTs = Date.now();
   }
-  renderScan(); renderSession();
+  renderAll();
 }
 
 /* 应用语言：刷新所有静态文案 + 重新渲染动态内容 */
@@ -679,8 +710,7 @@ function applyLang(){
   document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
   document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
   $('langSel').value = LANG;
-  renderMode(); renderQuota(); renderScan(); renderChartEmpty(); renderCandleMeta();
-  if(state.selected){ renderHeader(state.selected); updateRisk(state.selected, state.riskLive); } else renderSession();
+  renderMode(); renderQuota(); renderAll();
 }
 function setLang(l){
   if(!I18N[l]) return;
@@ -690,18 +720,15 @@ function setLang(l){
 $('langSel').onchange = e => setLang(e.target.value);
 $('modeSwitch').onclick = () => setMode(!state.live);
 $('btnRefresh').onclick = refreshScan;
-$('btnCopy').onclick = copyTicker;
-$('btnReloadCandle').onclick = () => {
-  if(!state.selected) return;
-  if(state.live && !confirm(t('confirmReload'))) return;
-  selectStock(state.selected.symbol, true);
-};
-['fChg','fRvol','fMin','fMax'].forEach(id => $(id).addEventListener('input', renderScan));
+$('btnCopy').onclick = () => copySym(state.selected?.symbol);
+['fChg','fRvol','fMin','fMax'].forEach(id => $(id).addEventListener('input', () => { renderScan(); renderPicks(); }));
+['pCap','pRisk','pStop','pRR'].forEach(id => $(id).addEventListener('input', () => { saveRiskInputs(); renderPicks(); renderSelected(); }));
 $('btnKey').onclick = () => { $('keyBar').classList.toggle('hidden'); $('keyInput').value = lsGet(LS.key) || ''; };
 $('keySave').onclick = () => { lsSet(LS.key, $('keyInput').value.trim()); toast(t('keySaved')); $('keyBar').classList.add('hidden'); };
 $('keyClear').onclick = () => { localStorage.removeItem(LS.key); $('keyInput').value=''; toast(t('keyCleared')); };
 
 /* 初始化：不自动请求任何数据 */
+loadRiskInputs();
 if(state.live && !getKey()) state.live = false;
 applyLang();
 setMode(state.live);

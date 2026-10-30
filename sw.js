@@ -2,7 +2,7 @@
  * - 缓存应用外壳与 CDN 脚本，使应用可离线打开
  * - FMP API 请求一律走网络，绝不缓存（保证数据真实，也不会误吞额度计数）
  * 更新网页后，请把下面的版本号 +1，手机才会拉取新版本。 */
-const VERSION = 'dayscan-v2';
+const VERSION = 'dayscan-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
