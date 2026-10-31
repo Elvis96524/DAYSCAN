@@ -236,13 +236,18 @@ const I18N = {
     notLoaded:'尚未加载，请点击「手动刷新」',
     fChg:'涨幅 > %', fRvol:'RVOL >', fMin:'价格 ≥ $', fMax:'价格 ≤ $',
     filterHint:'修改筛选条件只在本地重新过滤缓存数据，不消耗 API。',
-    scanFoot:'点击股票 → 真实模式下会按需获取该股报价（约 1–2 次请求，有缓存），评分与计划在本机计算',
-    enrichBtn:'补全 Top 8 的 RVOL', enrichHint:'RVOL 需要单独获取成交量：点上方「补全」（约 8–16 次请求），或点击个股（1–2 次）。补全前评级最高为「可关注」。',
+    scanFoot:'点击股票 → 真实模式下会按需获取该股数据（1 次请求，有缓存），评分与计划在本机计算',
+    enrichBtn:'补全 Top 8 的 RVOL', enrichHint:'RVOL 需要单独获取成交量：点上方「补全」（约 8 次请求），或点击个股（1 次）。补全前评级最高为「可关注」。',
     quoteLoading:'正在获取报价与平均成交量…', quoteFail:'获取报价失败：{msg}',
     avgFail:'没拿到平均成交量（{msg}），该股 RVOL 仍为未知',
-    noProfileStop:'你的套餐似乎不支持平均成交量接口，已停止继续请求（避免浪费额度）',
+    noProfileStop:'连续多只股票被拒绝访问（可能是 Key 无效或套餐限制），已停止继续请求以免浪费额度',
     confirmEnrich:'将为 {n} 只股票补全 RVOL，预计消耗约 {req} 次请求（今日已用 {used}/{limit}）。继续？',
     enrichNone:'前几名都已有最新数据，无需补全', enrichMock:'测试模式的模拟数据已带 RVOL，无需补全', enrichDone:'已补全 {n} 只股票',
+    enrichDonePart:'已补全 {n} 只，{f} 只失败或无权限',
+    symRestricted:'这只股票不在你的 FMP 套餐覆盖范围内（402），拿不到成交量数据；24 小时内不再重试',
+    rvolBlocked:'无权限',
+    rsnRvolExtreme:'RVOL 高达 {v}×，平均成交量可能极小或失真，数字仅供参考',
+    rsnMicroCap:'市值仅 ${v}，极小盘股：点差宽、易被停牌',
     rvolAdjLabel:'RVOL 按交易时间折算（推荐）',
     rvolAdjMeta:'RVOL 已按报价时刻折算（例如榜单抓取时约已完成 {p}% 的全天成交量）',
     rvolRawMeta:'RVOL = 当前成交量 ÷ 平均成交量（未折算）',
@@ -306,13 +311,18 @@ const I18N = {
     notLoaded:'Not loaded yet — click "Refresh Data"',
     fChg:'Change > %', fRvol:'RVOL >', fMin:'Price ≥ $', fMax:'Price ≤ $',
     filterHint:'Changing filters only re-filters cached data locally — no API calls.',
-    scanFoot:'Click a stock → in live mode its quote is fetched on demand (about 1–2 requests, cached); scoring and plan run locally',
-    enrichBtn:'Fill RVOL for Top 8', enrichHint:'RVOL needs volume data fetched separately: click "Fill" above (about 8–16 requests) or click a stock (1–2). Until then the grade is capped at "Watch".',
+    scanFoot:'Click a stock → in live mode its data is fetched on demand (1 request, cached); scoring and plan run locally',
+    enrichBtn:'Fill RVOL for Top 8', enrichHint:'RVOL needs volume data fetched separately: click "Fill" above (about 8 requests) or click a stock (1). Until then the grade is capped at "Watch".',
     quoteLoading:'Fetching quote and average volume…', quoteFail:'Quote failed: {msg}',
     avgFail:'Could not get average volume ({msg}); RVOL stays unknown for this stock',
-    noProfileStop:'Your plan does not seem to include the average-volume endpoint; stopped further requests to save quota',
+    noProfileStop:'Several stocks in a row were refused (invalid key or plan limits); stopped further requests to save quota',
     confirmEnrich:'RVOL will be filled for {n} stocks, using about {req} requests (used today: {used}/{limit}). Continue?',
     enrichNone:'The top picks already have fresh data', enrichMock:'Mock data already includes RVOL', enrichDone:'Filled {n} stocks',
+    enrichDonePart:'Filled {n}; {f} failed or not covered',
+    symRestricted:'This stock is outside your FMP plan coverage (402), so no volume data; will not retry for 24 hours',
+    rvolBlocked:'No access',
+    rsnRvolExtreme:'RVOL as high as {v}× — average volume may be tiny or distorted; treat with caution',
+    rsnMicroCap:'Market cap only ${v} — micro-cap: wide spreads, halt risk',
     rvolAdjLabel:'Time-adjust RVOL (recommended)',
     rvolAdjMeta:'RVOL is time-adjusted to each quote time (e.g. about {p}% of full-day volume at list time)',
     rvolRawMeta:'RVOL = current volume ÷ average volume (not adjusted)',
@@ -390,7 +400,7 @@ function toast(msg, ms=3200){ const el=$('toast'); el.textContent=msg; el.classL
 function getKey(){ return (lsGet(LS.key) || (FMP_API_KEY==='YOUR_FMP_API_KEY' ? '' : FMP_API_KEY) || '').trim(); }
 
 /* 清理旧版本遗留的 K 线缓存 */
-try { Object.keys(localStorage).filter(k => k.startsWith('dt_candle_')).forEach(k => localStorage.removeItem(k)); } catch(e){}
+try { Object.keys(localStorage).filter(k => /^dt_(candle|q|avg)_/.test(k)).forEach(k => localStorage.removeItem(k)); } catch(e){}
 
 /* ---------------------------- 状态 ---------------------------- */
 const state = {
@@ -399,7 +409,7 @@ const state = {
   scanTs: null,
   selected: null,
   rvolOn: true, rvolFrac: 1, rvolFloor: false,
-  noProfile: false, avgMiss: 0
+  noProfile: false, failStreak: 0
 };
 
 /* ---------------------------- API 额度计数 ---------------------------- */
@@ -539,7 +549,7 @@ function renderScan(){
         <span>$${fmt(r.price)}</span>
       </div>
       <div class="flex items-center gap-2 text-[11px] mt-1">
-        <span class="badge ${r.rvol==null?'mute':'up'}" title="${r.rvolRaw!=null ? 'raw '+fmt(r.rvolRaw,2)+'×' : ''}">RVOL ${r.rvol==null?t('rvolNA'):fmt(r.rvol,1)+'x'}</span>
+        <span class="badge ${r.rvol==null?'mute':'up'}" title="${r.rvolRaw!=null ? 'raw '+fmt(r.rvolRaw,2)+'×' : ''}">RVOL ${r.rvol==null ? (isBlocked(r.symbol) ? t('rvolBlocked') : t('rvolNA')) : (r.rvol>=100 ? '99x+' : fmt(r.rvol,1)+'x')}</span>
         <span class="mute">Vol ${fmtVol(r.volume)}</span>
       </div>
     </div>`).join('');
@@ -603,6 +613,7 @@ function liquidityEstimate(s, ses){
   if(s.volume != null){ if(s.volume < 500000) score += 2; else if(s.volume < 2000000) score += 1; }
   if(s.rvol != null && s.rvol > 8) score += 1;                     // 极端放量常伴随点差剧烈波动
   if(Math.abs(s.changePct) > 15) score += 1;
+  if(s.marketCap>0){ if(s.marketCap<5e7) score += 2; else if(s.marketCap<3e8) score += 1; }   // 极小市值：点差/停牌风险更高
   if(isOffHours(ses)) score += 2;
   if(ses.key==='closed') score += 1;
   if(score >= 5) return { lvl:'bad',  lv:t('liqBad'),  color:'var(--down)', note:t('liqBadNote') };
@@ -632,6 +643,8 @@ function scoreStock(s, ses){
   else if(r>=3) reasons.push({tone:'good', txt:t('rsnRvolHigh',{v:fmt(r,1)})});
   else if(r>=2) reasons.push({tone:'neutral', txt:t('rsnRvolOk',{v:fmt(r,1)})});
   else reasons.push({tone:'warn', txt:t('rsnRvolLow',{v:fmt(r,1)})});
+  if(r!=null && r>=50) reasons.push({tone:'warn', txt:t('rsnRvolExtreme',{v:fmt(r,0)})});
+  if(s.marketCap>0 && s.marketCap<5e7) reasons.push({tone:'bad', txt:t('rsnMicroCap',{v:fmtVol(s.marketCap)})});
   if(v!=null){
     if(v>=2e6) reasons.push({tone:'good', txt:t('rsnVolHigh',{v:fmtVol(v)})});
     else if(v<5e5) reasons.push({tone:'warn', txt:t('rsnVolLow',{v:fmtVol(v)})});
@@ -719,52 +732,47 @@ function renderPicks(){
 /* =====================================================================
  *  选中股票 + eToro 风控卡片（纯本地，不请求 API）
  * ===================================================================== */
-/* ---------------------------- 按需补全（免费版：quote 取实时成交量，profile 取平均成交量） ---------------------------- */
+/* ---------------------------- 按需补全（只用 /stable/profile：一次请求同时拿到成交量与平均成交量） ----------------------------
+ * 实测：/quote 对小盘股（如 ONEG）返回 402「该 symbol 不在你的套餐内」，/profile 可用，所以不再使用 /quote。 */
 const quoteTtl = () => etSession().key==='closed' ? 6*3600e3 : 5*60e3;       // 休市时数据不变，缓存更久
-const quoteFresh = r => !!(r.fetchedAt && Date.now()-r.fetchedAt < quoteTtl() && (r.avgVolume>0 || state.noProfile));
-const avgCached = sym => { const c = lsGet('dt_avg_'+sym); return !!(c && Date.now()-c.ts < 24*3600e3); };
+const isBlocked = sym => { const b = lsGet('dt_bad_'+sym); return !!(b && Date.now()-b.ts < 24*3600e3); };
+const quoteFresh = r => isBlocked(r.symbol) || !!(r.fetchedAt && Date.now()-r.fetchedAt < quoteTtl() && r.avgVolume>0);
 
-/* 返回 null 表示成功；返回字符串表示「报价已更新，但平均成交量没拿到」及原因。报价本身失败会抛错。 */
+/* 成功返回 null；失败抛错（含「无权限」「缺字段」）。 */
 async function enrichOne(stock){
-  const sym = stock.symbol, ttl = quoteTtl();
-  const qk = 'dt_q_'+sym, qc = lsGet(qk);
-  let q, fetchedAt;
-  if(qc && Date.now()-qc.ts < ttl){ q = qc.d; fetchedAt = qc.ts; }
+  const sym = stock.symbol;
+  if(isBlocked(sym)) throw new Error(t('symRestricted'));
+  const pk = 'dt_p_'+sym, pc = lsGet(pk);
+  let pf, fetchedAt;
+  if(pc && Date.now()-pc.ts < quoteTtl()){ pf = pc.d; fetchedAt = pc.ts; }
   else {
-    const r = await fmp('/quote', { symbol:sym });
-    q = Array.isArray(r) ? r[0] : r;
-    if(!q) throw new Error('empty quote');
-    fetchedAt = Date.now(); lsSet(qk, { ts:fetchedAt, d:q });
-  }
-  let avg = null, avgErr = null;
-  const ak = 'dt_avg_'+sym, ac = lsGet(ak);
-  if(ac && Date.now()-ac.ts < 24*3600e3){                                  // 平均成交量变化慢，缓存 24 小时省额度（v=0 表示「查过但没有该字段」，同样不重复请求）
-    if(ac.v>0) avg = ac.v; else avgErr = 'averageVolume field missing';
-  }
-  else if(state.noProfile) avgErr = 'profile unavailable';
-  else {
-    try{
-      const r = await fmp('/profile', { symbol:sym });
-      const pf = Array.isArray(r) ? r[0] : r;
-      avg = num(pf?.averageVolume ?? pf?.avgVolume);
-      if(avg>0){ lsSet(ak, { ts:Date.now(), v:avg }); state.avgMiss = 0; }
-      else {
-        avgErr = 'averageVolume field missing'; lsSet(ak, { ts:Date.now(), v:0 });
-        if(++state.avgMiss >= 2) state.noProfile = true;                      // 连续两只都没有该字段：判定接口不提供，停止重试
+    let r;
+    try{ r = await fmp('/profile', { symbol:sym }); }
+    catch(e){
+      if(/\b402\b/.test(e.message)){                                        // 该股票不在套餐内：24 小时内不再请求
+        lsSet('dt_bad_'+sym, { ts:Date.now() });
+        if(++state.failStreak >= 3) state.noProfile = true;                 // 连续 3 只都被拒：判定整体不可用，停止
+        throw new Error(t('symRestricted'));
       }
-    }catch(e){
-      avgErr = e.message;
-      if(/\b40[12]\b/.test(e.message)) state.noProfile = true;               // 套餐不含：本次会话不再重试
+      if(/\b401\b/.test(e.message)) state.noProfile = true;                // Key 无效
+      throw e;
     }
+    const raw = Array.isArray(r) ? r[0] : r;
+    if(!raw) throw new Error('empty profile');
+    pf = { price:raw.price, changePercentage:raw.changePercentage ?? raw.changesPercentage, volume:raw.volume, averageVolume:raw.averageVolume ?? raw.avgVolume, marketCap:raw.marketCap };
+    fetchedAt = Date.now(); lsSet(pk, { ts:fetchedAt, d:pf });
   }
-  const price = num(q.price); if(price>0) stock.price = price;
-  const chg = num(q.changePercentage ?? q.changesPercentage); if(Number.isFinite(chg)) stock.changePct = chg;
-  stock.volume = num(q.volume);
+  state.failStreak = 0;
+  const price = num(pf.price); if(price>0) stock.price = price;
+  const chg = num(pf.changePercentage); if(Number.isFinite(chg)) stock.changePct = chg;
+  stock.volume = num(pf.volume);
+  stock.marketCap = num(pf.marketCap);
+  const avg = num(pf.averageVolume);
   if(avg>0) stock.avgVolume = avg;
-  let ts = num(q.timestamp); if(ts && ts<1e12) ts *= 1000;
-  stock.dataTs = ts || fetchedAt; stock.fetchedAt = fetchedAt;
+  stock.dataTs = fetchedAt; stock.fetchedAt = fetchedAt;                   // profile 没有时间戳，按抓取时刻折算
   lsSet(LS.scan, { ts:state.scanTs, rows:state.raw });
-  return avgErr;
+  if(!(avg>0)) throw new Error(t('avgFail',{msg:'averageVolume missing'}));
+  return null;
 }
 
 async function enrichTop(){
@@ -774,14 +782,12 @@ async function enrichTop(){
   const top = state.raw.filter(passFilter).map(s => ({ s, ...scoreStock(s, ses) })).sort((a,b)=>b.score-a.score).slice(0, ENRICH_N).map(x=>x.s);
   const need = top.filter(r => !quoteFresh(r));
   if(!need.length){ toast(t('enrichNone')); return; }
-  const req = need.reduce((n,r) => n + 1 + (avgCached(r.symbol) || state.noProfile ? 0 : 1), 0);
-  if(!confirm(t('confirmEnrich',{ n:need.length, req, used:quota().used, limit:DAILY_LIMIT }))) return;
+  if(!confirm(t('confirmEnrich',{ n:need.length, req:need.length, used:quota().used, limit:DAILY_LIMIT }))) return;
   const btn = $('btnEnrich'); btn.disabled = true; btn.textContent = t('loading');
-  let done = 0, lastErr = null;
+  let done = 0, failed = 0;
   try{
     for(const r of need){
-      try{ const e = await enrichOne(r); done++; if(e && !state.noProfile) lastErr = e; }
-      catch(e){ toast(t('quoteFail',{msg:e.message}), 6000); break; }
+      try{ await enrichOne(r); done++; } catch(e){ failed++; }
       if(state.noProfile) break;
     }
   } finally {
@@ -789,8 +795,7 @@ async function enrichTop(){
     renderAll();
   }
   if(state.noProfile) toast(t('noProfileStop'), 8000);
-  else if(lastErr) toast(t('avgFail',{msg:lastErr}), 7000);
-  else toast(t('enrichDone',{n:done}));
+  else toast(failed ? t('enrichDonePart',{n:done, f:failed}) : t('enrichDone',{n:done}), failed ? 7000 : 3200);
 }
 
 async function selectStock(sym, scroll=false){
@@ -799,12 +804,10 @@ async function selectStock(sym, scroll=false){
   renderScan(); renderPicks(); renderSelected();
   $('btnCopy').disabled = false;
   if(scroll && window.matchMedia('(max-width:1023px)').matches) $('riskCard').scrollIntoView({ behavior:'smooth', block:'start' });
-  if(state.live && !quoteFresh(stock)){                       // 点击才请求该股报价（懒加载）
+  if(state.live && !state.noProfile && !quoteFresh(stock)){                  // 点击才请求该股数据（懒加载）
     $('selName').textContent = t('quoteLoading');
-    try{
-      const e = await enrichOne(stock);
-      if(e) toast(state.noProfile ? t('noProfileStop') : t('avgFail',{msg:e}), 7000);
-    }catch(e){ toast(t('quoteFail',{msg:e.message}), 6000); }
+    try{ await enrichOne(stock); }
+    catch(e){ toast(t('quoteFail',{msg:e.message}), 7000); }
     if(state.selected?.symbol === sym) renderAll();
   }
 }
