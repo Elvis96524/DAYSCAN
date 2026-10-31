@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0b0e14">
+<meta name="theme-color" content="#0c0a1f">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -12,186 +12,382 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="DayScan">
 <title>DayScan · 美股日内交易扫描器</title>
-<script src="https://cdn.tailwindcss.com"></script>
 <style>
-  :root { --bg:#0b0e14; --panel:#11151d; --line:#1f2633; --txt:#d5dbe6; --mute:#7a8599; --up:#26d98b; --down:#ff5c6c; --acc:#4aa3ff; }
-  html,body { background:var(--bg); color:var(--txt); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; }
-  .up { color:var(--up); } .down { color:var(--down); } .mute { color:var(--mute); }
-  .row { border-bottom:1px solid var(--line); cursor:pointer; transition:background .12s; }
-  .row:hover { background:#161c28; }
-  .row.active { background:#16243a; box-shadow: inset 3px 0 0 var(--acc); }
-  .pick { background:#0e121a; border:1px solid var(--line); border-radius:8px; cursor:pointer; transition:border-color .12s; }
-  .pick:hover { border-color:var(--acc); }
-  .pick.sel { border-color:var(--acc); box-shadow: inset 3px 0 0 var(--acc); }
-  .btn { border:1px solid var(--line); background:#161c28; border-radius:6px; padding:6px 12px; font-size:12px; transition:all .12s; }
-  .btn:hover { border-color:var(--acc); color:#fff; }
-  .btn-primary { background:#1b4a86; border-color:#2a6bc0; color:#fff; }
-  .btn-primary:hover { background:#2260ad; }
-  .btn:disabled { opacity:.5; cursor:not-allowed; }
-  select.btn { padding:5px 8px; cursor:pointer; color:var(--txt); }
-  select.btn option { background:#11151d; color:#d5dbe6; }
-  input[type=number], input[type=text], input[type=password] { background:#0b0e14; border:1px solid var(--line); border-radius:6px; padding:4px 8px; color:var(--txt); font-size:12px; width:100%; }
-  .switch { position:relative; width:42px; height:22px; background:#2a3242; border-radius:999px; cursor:pointer; transition:.2s; flex:none; }
-  .switch::after { content:""; position:absolute; top:3px; left:3px; width:16px; height:16px; background:#fff; border-radius:50%; transition:.2s; }
-  .switch.live { background:#c2410c; } .switch.live::after { left:23px; }
-  .badge { font-size:10px; padding:1px 6px; border-radius:4px; border:1px solid var(--line); display:inline-block; }
-  ::-webkit-scrollbar { width:8px; height:8px; } ::-webkit-scrollbar-thumb { background:#252d3d; border-radius:4px; }
-  #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#1c2332; border:1px solid var(--line); padding:8px 16px; border-radius:8px; font-size:12px; opacity:0; pointer-events:none; transition:opacity .2s; z-index:50; max-width:90vw; }
-  #toast.show { opacity:1; }
+  :root{
+    --ink:#0c0a1f; --surface:#14112c; --raised:#1c1840;
+    --line:rgba(160,150,255,.14); --line2:rgba(160,150,255,.3);
+    --text:#ecebff; --muted:#a09dc8;
+    --violet:#8b5cf6; --sky:#38bdf8; --mint:#34e0a1; --coral:#ff6b7a; --amber:#ffb547; --pink:#f472b6;
+    --r:18px; --r2:12px;
+  }
+  *{box-sizing:border-box}
+  html{background:var(--ink); color-scheme:dark}
+  body{
+    margin:0; min-height:100vh; color:var(--text);
+    font:14px/1.45 system-ui,-apple-system,"Segoe UI","PingFang SC","Noto Sans CJK SC","Microsoft YaHei",Roboto,sans-serif;
+    font-variant-numeric:tabular-nums; -webkit-font-smoothing:antialiased;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(60rem 38rem at 6% -12%, rgba(139,92,246,.38), transparent 60%),
+      radial-gradient(50rem 34rem at 104% -4%, rgba(56,189,248,.24), transparent 58%),
+      radial-gradient(46rem 30rem at 62% 112%, rgba(244,114,182,.2), transparent 58%);
+  }
+  .hidden{display:none!important}
+  .muted{color:var(--muted)}
+  :focus-visible{outline:2px solid var(--sky); outline-offset:2px}
+  ::-webkit-scrollbar{width:8px;height:8px} ::-webkit-scrollbar-thumb{background:rgba(160,150,255,.25);border-radius:8px}
+
+  .topbar{
+    position:sticky; top:0; z-index:30; display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px;
+    padding:12px 20px; background:rgba(12,10,31,.72); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+    border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex; align-items:center; gap:12px}
+  .mark{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--violet),var(--sky) 60%,var(--mint)); box-shadow:0 6px 20px -6px rgba(139,92,246,.7)}
+  .brand h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+  .brand small{display:block;color:var(--muted);font-size:11.5px}
+  .tools{margin-left:auto; display:flex; flex-wrap:wrap; align-items:center; gap:10px}
+  .quota{display:flex;align-items:center;gap:10px;padding:6px 12px;border-radius:999px;background:rgba(160,150,255,.1);border:1px solid var(--line);font-size:12px}
+  .quota .bar{width:64px;height:6px;border-radius:99px;background:rgba(160,150,255,.2);overflow:hidden}
+  .quota .bar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--mint),var(--sky));transition:width .4s}
+  .quota b{color:#fff}
+
+  .btn{font:inherit;font-size:12.5px;font-weight:600;color:var(--text);cursor:pointer;padding:8px 14px;border-radius:999px;
+    background:rgba(160,150,255,.12);border:1px solid var(--line);transition:background .15s,border-color .15s,transform .1s}
+  .btn:hover{background:rgba(160,150,255,.2);border-color:var(--line2)}
+  .btn:active{transform:scale(.97)}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+  .btn-primary{color:#fff;border-color:transparent;background:linear-gradient(135deg,var(--violet),#5b8def 60%,var(--sky));box-shadow:0 8px 22px -10px rgba(139,92,246,.9)}
+  .btn-primary:hover{background:linear-gradient(135deg,#9b72f8,#6c9cf5 60%,#52c7f5)}
+  .btn-sm{padding:3px 9px;font-size:12px}
+  select.btn{appearance:none;-webkit-appearance:none;padding-right:14px}
+  select.btn option{background:#14112c;color:#ecebff}
+  input[type=number],input[type=password]{
+    width:100%;height:38px;padding:0 12px;font:inherit;font-size:13px;color:var(--text);
+    background:rgba(8,6,24,.6);border:1px solid var(--line);border-radius:10px;transition:border-color .15s,box-shadow .15s}
+  input[type=number]:focus,input[type=password]:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3px rgba(56,189,248,.2)}
+  input[type=checkbox]{accent-color:var(--violet);width:16px;height:16px;flex:none}
+  .field{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted)}
+  .check{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer}
+
+  .seg2{display:inline-flex;padding:3px;border-radius:999px;background:rgba(160,150,255,.12);border:1px solid var(--line);cursor:pointer;user-select:none}
+  .seg2 span{padding:6px 13px;border-radius:999px;font-size:12px;font-weight:700;color:var(--muted);transition:background .2s,color .2s}
+  .seg2 span.on.test{background:linear-gradient(135deg,var(--sky),var(--violet));color:#fff}
+  .seg2 span.on.liv{background:linear-gradient(135deg,var(--amber),var(--coral));color:#1c1030}
+
+  .keybar{padding:12px 20px;background:rgba(20,17,44,.9);border-bottom:1px solid var(--line);font-size:12px}
+  .keybar .in{display:flex;flex-wrap:wrap;align-items:center;gap:10px;max-width:880px}
+  .keybar input{flex:1;min-width:220px;width:auto}
+
+  .wrap{max-width:1280px;margin:0 auto;padding:16px 16px 48px;display:flex;flex-direction:column;gap:16px}
+  .layout{display:grid;grid-template-columns:minmax(340px,410px) 1fr;gap:16px;align-items:start}
+  .stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .card{background:linear-gradient(180deg,rgba(30,26,68,.82),rgba(20,17,44,.82));border:1px solid var(--line);border-radius:var(--r);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+  .card-pad{padding:18px}
+  .card-title{display:flex;align-items:center;gap:10px;margin:0;font-size:16px;font-weight:750;letter-spacing:-.01em}
+  .count{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:rgba(139,92,246,.22);color:#cdbbff}
+
+  .strip{padding:16px 20px 12px}
+  .strip-top{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 18px;margin-bottom:30px}
+  .strip-title{display:flex;align-items:center;gap:10px;font-size:16px}
+  .strip-title b{font-weight:750}
+  .live-dot{width:10px;height:10px;border-radius:50%;background:var(--dot,var(--muted));box-shadow:0 0 14px 1px var(--dot,transparent)}
+  .strip-note{font-size:12.5px}
+  .strip-track{position:relative;height:20px}
+  .strip-bar{display:flex;gap:3px;height:20px}
+  .seg{display:block;position:relative;border-radius:999px;overflow:hidden;opacity:.34;transition:opacity .3s}
+  .seg.cur{opacity:1}
+  .seg em{position:absolute;inset:0;display:grid;place-items:center;font-style:normal;font-size:11px;font-weight:750;color:#1a1030}
+  .seg-pre{background:linear-gradient(90deg,#ffb547,#ff9a5c)}
+  .seg-open{background:var(--coral)}
+  .seg-regular{background:linear-gradient(90deg,var(--mint),var(--sky))}
+  .seg-after{background:linear-gradient(90deg,#ff9a5c,var(--pink))}
+  .strip-now{position:absolute;top:50%;left:var(--p,0%);width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;background:#fff;
+    box-shadow:0 0 0 5px rgba(255,255,255,.18),0 6px 18px rgba(0,0,0,.55);transition:left 1.1s cubic-bezier(.2,.8,.2,1)}
+  .strip-now.off{display:none}
+  .strip-now span{position:absolute;bottom:34px;left:50%;transform:translateX(-50%);padding:3px 9px;border-radius:9px;background:#fff;color:#150f33;font-size:11.5px;font-weight:750;white-space:nowrap}
+  .strip-now.edge-l span{left:0;transform:none}
+  .strip-now.edge-r span{left:auto;right:0;transform:none}
+  .strip-ticks{position:relative;height:20px;margin-top:8px;font-size:11.5px;color:var(--muted)}
+  .strip-ticks span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+  .strip-ticks span:first-child{transform:none}
+  .strip-ticks span:last-child{transform:translateX(-100%)}
+
+  .scan{position:sticky;top:84px;display:flex;flex-direction:column;max-height:calc(100vh - 100px);overflow:hidden}
+  .scan-head{padding:18px 18px 14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:12px}
+  .scan-head .line{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .meta{font-size:12px;line-height:1.5;color:var(--muted)}
+  .tag-live{color:var(--amber);font-weight:700} .tag-mock{color:var(--sky);font-weight:700}
+  .warn-txt{color:var(--amber)}
+  .filters{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 12px}
+  .scan-list{flex:1;overflow-y:auto;min-height:180px;padding:8px}
+  .scan-foot{padding:10px 18px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)}
+  .empty{padding:28px 16px;text-align:center;color:var(--muted);font-size:13px}
+
+  .row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;
+    padding:10px 12px;margin:0 0 4px;border-radius:14px;border:1px solid transparent;background:transparent;transition:background .15s,border-color .15s}
+  .row:hover{background:rgba(160,150,255,.09)}
+  .row.active{background:linear-gradient(90deg,rgba(139,92,246,.26),rgba(56,189,248,.1));border-color:rgba(139,92,246,.5)}
+  .avatar{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;flex:none;font-weight:800;font-size:13px;color:#140f30;
+    background:linear-gradient(135deg,hsl(var(--h,260) 85% 68%),hsl(calc(var(--h,260) + 45) 85% 60%))}
+  .row-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .sym{font-size:15px;font-weight:800;letter-spacing:.01em}
+  .nm{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row-chips{display:flex;align-items:center;gap:8px;margin-top:3px;font-size:11.5px}
+  .row-side{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+  .px{font-size:15px;font-weight:700}
+  .pill{display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
+  .pill-up{color:var(--mint);background:rgba(52,224,161,.14)}
+  .pill-down{color:var(--coral);background:rgba(255,107,122,.15)}
+  .pill-warn{color:var(--amber);background:rgba(255,181,71,.15)}
+  .pill-bad{color:var(--coral);background:rgba(255,107,122,.12)}
+  .pill-mute{color:var(--muted);background:rgba(160,150,255,.12)}
+
+  .picks-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+  .picks-head .right{display:flex;align-items:center;gap:12px;font-size:12px;color:var(--muted)}
+  .hint{margin:10px 0 0;font-size:12px;color:var(--amber)}
+  .hint:empty{display:none}
+  .params{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px 12px;margin:16px 0}
+  .picks-list{display:flex;flex-direction:column;gap:12px}
+  .disclaimer{margin:14px 0 0;font-size:11.5px;line-height:1.55;color:var(--muted)}
+
+  .pick{position:relative;padding:14px 16px 14px 20px;border-radius:var(--r2);cursor:pointer;border:1px solid var(--line);
+    background:rgba(10,8,28,.5);transition:border-color .15s,background .15s}
+  .pick::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:4px;border-radius:0 4px 4px 0;background:var(--gc,var(--violet))}
+  .pick:hover{border-color:var(--line2)}
+  .pick.sel{background:rgba(30,26,68,.75);border-color:var(--gc);box-shadow:0 14px 34px -18px var(--gc)}
+  .pick-head{display:flex;align-items:center;gap:12px}
+  .rank{width:20px;text-align:center;font-weight:800;color:var(--muted);font-size:13px}
+  .pick-id{display:flex;flex-direction:column;min-width:0;flex:1}
+  .pick-id b{font-size:16px;font-weight:800}
+  .pick-px{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+  .ring{width:48px;height:48px;border-radius:50%;flex:none;display:grid;place-items:center;
+    background:conic-gradient(var(--c,var(--violet)) calc(var(--p,0)*1%),rgba(160,150,255,.16) 0)}
+  .ring span{width:37px;height:37px;border-radius:50%;display:grid;place-items:center;background:#16132f;font-size:13.5px;font-weight:800}
+  .pick-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:12px}
+  .chip,.grade{position:relative;isolation:isolate;display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;color:var(--cc,var(--muted))}
+  .chip::before,.grade::before{content:"";position:absolute;inset:0;border-radius:inherit;background:var(--cc);opacity:.14;z-index:-1}
+  .chip::after,.grade::after{content:"";position:absolute;inset:0;border-radius:inherit;border:1px solid var(--cc);opacity:.4;z-index:-1}
+  .grade{font-weight:800;padding:2px 11px}
+  .plan{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px;margin-top:12px}
+  .tile{border-radius:12px;padding:9px 11px;border:1px solid transparent}
+  .tile small{display:block;font-size:11.5px;color:var(--muted);margin-bottom:2px}
+  .tile b{font-size:15.5px;font-weight:800}
+  .t-entry{background:rgba(56,189,248,.12);border-color:rgba(56,189,248,.3)} .t-entry b{color:#7fd6fb}
+  .t-stop{background:rgba(255,107,122,.12);border-color:rgba(255,107,122,.3)} .t-stop b{color:#ff98a2}
+  .t-target{background:rgba(52,224,161,.12);border-color:rgba(52,224,161,.3)} .t-target b{color:#6fe9bd}
+  .t-size{background:rgba(139,92,246,.16);border-color:rgba(139,92,246,.38)} .t-size b{color:#c3adff}
+  .plan-note{margin:8px 0 0;font-size:11.5px;color:var(--muted)}
+
+  .risk{position:relative;padding:20px;border-radius:var(--r);border:1px solid transparent;
+    background:linear-gradient(180deg,#1d1942,#14112c) padding-box,
+               linear-gradient(135deg,rgba(139,92,246,.7),rgba(56,189,248,.45) 50%,rgba(52,224,161,.5)) border-box}
+  .sel-head{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+  .sel-id{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 14px}
+  .sel-sym{font-size:30px;font-weight:850;letter-spacing:-.02em;line-height:1}
+  .sel-px{font-size:22px;font-weight:700}
+  .sel-name{margin-top:4px;font-size:12.5px;color:var(--muted)}
+  .sel-actions{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .sess-badge{font-size:11.5px;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid currentColor}
+  .sess-badge:empty{display:none}
+  .risk h3{margin:20px 0 12px;font-size:14px;font-weight:750;display:flex;align-items:center;gap:8px}
+  .risk h3 i{width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--mint),var(--sky))}
+  .info{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+  .box{padding:14px 15px;border-radius:14px;background:rgba(8,6,24,.5);border:1px solid var(--line);font-size:12.5px}
+  .box.warn{background:rgba(255,181,71,.07);border-color:rgba(255,181,71,.38)}
+  .box .ttl{color:var(--muted);margin-bottom:6px;font-size:12px}
+  .box.warn .ttl{color:var(--amber);font-weight:700}
+  .box .big{font-size:15.5px;font-weight:800}
+  .box .note{margin-top:6px;line-height:1.55;color:var(--muted)}
+  .meter{display:flex;gap:4px;margin:8px 0 6px}
+  .meter i{flex:1;height:6px;border-radius:99px;background:rgba(160,150,255,.18)}
+  .meter[data-lvl=good] i:nth-child(1){background:var(--mint)}
+  .meter[data-lvl=mid] i:nth-child(-n+2){background:var(--amber)}
+  .meter[data-lvl=bad] i{background:var(--coral)}
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
+  .kv b{font-weight:800}
+  .kv .c-entry{color:#7fd6fb} .kv .c-stop{color:#ff98a2} .kv .c-target{color:#6fe9bd} .kv .c-size{color:#c3adff}
+  .tips{margin:16px 0 0;padding-left:18px;color:var(--muted);font-size:12px;line-height:1.6}
+
+  #toast{position:fixed;left:50%;bottom:20px;z-index:60;max-width:min(92vw,560px);padding:11px 18px;border-radius:14px;font-size:13px;line-height:1.45;
+    background:rgba(34,29,76,.96);border:1px solid var(--line2);box-shadow:0 18px 40px -12px rgba(0,0,0,.6);
+    opacity:0;transform:translate(-50%,10px);pointer-events:none;transition:opacity .2s,transform .2s}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+
+  @media (max-width:1023px){
+    .layout{grid-template-columns:1fr}
+    .scan{position:static;max-height:none}
+    .scan-list{max-height:62vh}
+    .topbar{padding:10px 14px}
+    .tools{margin-left:0;width:100%}
+    .wrap{padding:12px 12px 40px}
+  }
+  @media (max-width:520px){
+    .brand small{display:none}
+    .sel-sym{font-size:26px}
+    .strip{padding:14px 14px 10px}
+    .quota .bar{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important} }
 </style>
 </head>
-<body class="min-h-screen flex flex-col">
+<body>
 
-<!-- ===================== 头部 / Header ===================== -->
-<header class="flex flex-wrap items-center gap-3 px-4 py-3 border-b" style="border-color:var(--line)">
-  <div class="flex items-center gap-2">
-    <span class="text-lg font-bold tracking-wider" style="color:var(--acc)">▌DAYSCAN</span>
-    <span class="mute text-xs hidden sm:inline" data-i18n="sub"></span>
+<header class="topbar">
+  <div class="brand">
+    <span class="mark" aria-hidden="true">
+      <svg viewBox="0 0 32 32" width="22" height="22" fill="none"><g stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M9 7v18M16 4v20M23 9v17"/></g><g fill="#fff"><rect x="6.5" y="12" width="5" height="9" rx="1.2"/><rect x="13.5" y="9" width="5" height="9" rx="1.2" opacity=".78"/><rect x="20.5" y="14" width="5" height="8" rx="1.2"/></g></svg>
+    </span>
+    <div>
+      <h1>DayScan</h1>
+      <small data-i18n="sub"></small>
+    </div>
   </div>
 
-  <div class="ml-auto flex flex-wrap items-center gap-3 text-xs">
-    <!-- API 额度计数器 -->
-    <div class="panel px-3 py-1.5 flex items-center gap-2" data-i18n-title="quotaTip">
-      <span class="mute" data-i18n="quotaLabel"></span>
-      <span id="quotaText" class="font-bold">0 / 250</span>
-      <div class="w-20 h-1.5 rounded overflow-hidden" style="background:#222a39"><div id="quotaBar" class="h-full" style="width:0;background:var(--up)"></div></div>
-      <span class="mute"><span data-i18n="quotaLeftLabel"></span> <b id="quotaLeft" class="text-white">250</b></span>
+  <div class="tools">
+    <div class="quota" data-i18n-title="quotaTip">
+      <span class="muted" data-i18n="quotaLabel"></span>
+      <b id="quotaText">0 / 250</b>
+      <span class="bar"><i id="quotaBar"></i></span>
+      <span class="muted"><span data-i18n="quotaLeftLabel"></span> <b id="quotaLeft">250</b></span>
     </div>
-
-    <!-- 语言切换 / Language -->
     <select id="langSel" class="btn" aria-label="Language / 语言">
       <option value="zh">🌐 中文</option>
       <option value="en">🌐 English</option>
     </select>
-
-    <button id="btnKey" class="btn">🔑 API Key</button>
-
-    <!-- 测试 / 真实 切换 -->
-    <div class="flex items-center gap-2">
-      <span id="modeMock" class="font-bold" data-i18n="modeMock"></span>
-      <div id="modeSwitch" class="switch" role="switch" data-i18n-aria="modeAria"></div>
-      <span id="modeLive" class="mute" data-i18n="modeLive"></span>
+    <button id="btnKey" class="btn" type="button">🔑 API Key</button>
+    <div id="modeSwitch" class="seg2" role="switch" tabindex="0" aria-checked="false" data-i18n-aria="modeAria">
+      <span id="modeMock" class="test on" data-i18n="modeMock"></span>
+      <span id="modeLive" class="liv" data-i18n="modeLive"></span>
     </div>
   </div>
 </header>
 
-<!-- API Key 设置条 -->
-<div id="keyBar" class="hidden px-4 py-3 border-b text-xs" style="border-color:var(--line);background:#0e121a">
-  <div class="flex flex-wrap items-center gap-2 max-w-3xl">
-    <span class="mute" data-i18n="keyHint"></span>
-    <input id="keyInput" type="password" data-i18n-ph="keyPh" class="flex-1 min-w-[220px]" style="width:auto">
-    <button id="keySave" class="btn btn-primary" data-i18n="save"></button>
-    <button id="keyClear" class="btn" data-i18n="clear"></button>
+<div id="keyBar" class="keybar hidden">
+  <div class="in">
+    <span class="muted" data-i18n="keyHint"></span>
+    <input id="keyInput" type="password" data-i18n-ph="keyPh" autocomplete="off">
+    <button id="keySave" class="btn btn-primary" type="button" data-i18n="save"></button>
+    <button id="keyClear" class="btn" type="button" data-i18n="clear"></button>
   </div>
 </div>
 
-<!-- ===================== 主体 / Main ===================== -->
-<main class="flex-1 grid gap-3 p-3 lg:grid-cols-[380px_1fr] min-h-0">
+<main class="wrap">
 
-  <!-- 左：扫描面板 -->
-  <section class="panel flex flex-col min-h-[420px] lg:h-[calc(100vh-120px)]">
-    <div class="p-3 border-b" style="border-color:var(--line)">
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="font-bold text-sm"><span data-i18n="scanTitle"></span> <span id="countBadge" class="badge mute">0</span></h2>
-        <button id="btnRefresh" class="btn btn-primary" data-i18n="refresh"></button>
-      </div>
-      <div id="scanMeta" class="mute text-[11px] mb-2"></div>
-      <div class="grid grid-cols-4 gap-2 text-[11px]">
-        <label><span data-i18n="fChg"></span><input id="fChg" type="number" step="0.5" value="3"></label>
-        <label><span data-i18n="fRvol"></span><input id="fRvol" type="number" step="0.1" value="2.0"></label>
-        <label><span data-i18n="fMin"></span><input id="fMin" type="number" step="0.5" value="1"></label>
-        <label><span data-i18n="fMax"></span><input id="fMax" type="number" step="1" value="50"></label>
-      </div>
-      <label class="flex items-center gap-2 text-[11px] mt-2 cursor-pointer"><input id="rvolAdj" type="checkbox" checked style="width:auto"><span data-i18n="rvolAdjLabel"></span></label>
-      <div class="mute text-[10px] mt-1" data-i18n="filterHint"></div>
+  <section class="card strip" aria-label="Market session">
+    <div class="strip-top">
+      <div class="strip-title"><span class="live-dot" id="sessDot"></span><b id="sessLabel">—</b><span class="muted" id="sessClock"></span></div>
+      <div class="strip-note muted" id="sessNote"></div>
     </div>
-    <div id="scanList" class="flex-1 overflow-y-auto text-sm"></div>
-    <div class="px-3 py-2 border-t mute text-[10px]" style="border-color:var(--line)" data-i18n="scanFoot"></div>
+    <div class="strip-track" id="sessTrack" role="img">
+      <div class="strip-bar" id="sessBar"></div>
+      <div class="strip-now off" id="sessNow"><span id="sessNowTime"></span></div>
+    </div>
+    <div class="strip-ticks" id="sessTicks"></div>
   </section>
 
-  <!-- 右：建议入手 + 风控 -->
-  <section class="flex flex-col gap-3 min-w-0">
+  <div class="layout">
 
-    <!-- ⭐ 建议入手区 -->
-    <div class="panel p-4" id="picksCard">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <h3 class="font-bold text-sm">⭐ <span data-i18n="picksTitle"></span> <span id="picksBadge" class="badge mute">0</span></h3>
-        <div class="flex items-center gap-2">
-          <span class="mute text-[10px]" data-i18n="picksSub"></span>
-          <button id="btnEnrich" class="btn btn-primary" data-i18n="enrichBtn"></button>
+    <section class="card scan">
+      <div class="scan-head">
+        <div class="line">
+          <h2 class="card-title"><span data-i18n="scanTitle"></span> <span id="countBadge" class="count">0</span></h2>
+          <button id="btnRefresh" class="btn btn-primary" type="button" data-i18n="refresh"></button>
         </div>
+        <div id="scanMeta" class="meta"></div>
+        <div class="filters">
+          <label class="field"><span data-i18n="fChg"></span><input id="fChg" type="number" step="0.5" value="3"></label>
+          <label class="field"><span data-i18n="fRvol"></span><input id="fRvol" type="number" step="0.1" value="2.0"></label>
+          <label class="field"><span data-i18n="fMin"></span><input id="fMin" type="number" step="0.5" value="1"></label>
+          <label class="field"><span data-i18n="fMax"></span><input id="fMax" type="number" step="1" value="50"></label>
+        </div>
+        <label class="check"><input id="rvolAdj" type="checkbox" checked><span data-i18n="rvolAdjLabel"></span></label>
+        <div class="meta" style="font-size:11.5px" data-i18n="filterHint"></div>
       </div>
-      <div id="enrichHint" class="mute text-[10px] mt-2"></div>
+      <div id="scanList" class="scan-list"></div>
+      <div class="scan-foot" data-i18n="scanFoot"></div>
+    </section>
 
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 text-[11px] my-3">
-        <label><span data-i18n="pCap"></span><input id="pCap" type="number" min="1" step="50" value="1000"></label>
-        <label><span data-i18n="pRisk"></span><input id="pRisk" type="number" min="0.1" step="0.25" value="1"></label>
-        <label><span data-i18n="pStop"></span><input id="pStop" type="number" min="0.5" step="0.5" value="3"></label>
-        <label><span data-i18n="pRR"></span><input id="pRR" type="number" min="0.5" step="0.5" value="2"></label>
-        <label><span data-i18n="pPull"></span><input id="pPull" type="number" min="0" step="0.1" value="0.5"></label>
-        <label><span data-i18n="pCost"></span><input id="pCost" type="number" min="0" step="0.1" value="0.3"></label>
-      </div>
+    <div class="stack">
 
-      <div id="picksList" class="space-y-2"></div>
-      <div class="mute text-[10px] mt-3 leading-relaxed" data-i18n="picksDisclaimer"></div>
-    </div>
-
-    <!-- eToro 风控卡片 -->
-    <div class="panel p-4" id="riskCard">
-      <div class="flex flex-wrap items-center gap-3 mb-3">
-        <div>
-          <div class="flex items-baseline gap-3">
-            <span id="selSym" class="text-2xl font-bold">—</span>
-            <span id="selPrice" class="text-xl"></span>
-            <span id="selChg" class="text-sm"></span>
+      <section class="card card-pad" id="picksCard">
+        <div class="picks-head">
+          <h3 class="card-title">⭐ <span data-i18n="picksTitle"></span> <span id="picksBadge" class="count">0</span></h3>
+          <div class="right">
+            <span data-i18n="picksSub"></span>
+            <button id="btnEnrich" class="btn btn-primary" type="button" data-i18n="enrichBtn"></button>
           </div>
-          <div id="selName" class="mute text-xs"></div>
         </div>
-        <div class="ml-auto flex items-center gap-2">
-          <span id="sessionBadge" class="badge"></span>
-          <button id="btnCopy" class="btn" disabled data-i18n="copyBtn"></button>
-        </div>
-      </div>
+        <div id="enrichHint" class="hint"></div>
 
-      <h3 class="font-bold text-sm flex items-center gap-2 mb-3">
-        <span class="inline-block w-2 h-2 rounded-full" style="background:#7cc242"></span> <span data-i18n="riskTitle"></span>
-      </h3>
+        <div class="params">
+          <label class="field"><span data-i18n="pCap"></span><input id="pCap" type="number" min="1" step="50" value="1000"></label>
+          <label class="field"><span data-i18n="pRisk"></span><input id="pRisk" type="number" min="0.1" step="0.25" value="1"></label>
+          <label class="field"><span data-i18n="pStop"></span><input id="pStop" type="number" min="0.5" step="0.5" value="3"></label>
+          <label class="field"><span data-i18n="pRR"></span><input id="pRR" type="number" min="0.5" step="0.5" value="2"></label>
+          <label class="field"><span data-i18n="pPull"></span><input id="pPull" type="number" min="0" step="0.1" value="0.5"></label>
+          <label class="field"><span data-i18n="pCost"></span><input id="pCost" type="number" min="0" step="0.1" value="0.3"></label>
+        </div>
 
-      <div class="grid md:grid-cols-3 gap-3 text-xs">
-        <div class="p-3 rounded-md" style="background:#0e121a;border:1px solid var(--line)">
-          <div class="mute mb-1" data-i18n="liqTitle"></div>
-          <div id="liqLevel" class="text-base font-bold">—</div>
-          <div id="liqNote" class="mute mt-1 leading-relaxed"></div>
-        </div>
-        <div class="p-3 rounded-md" style="background:#0e121a;border:1px solid #6b4a12">
-          <div class="mb-1" style="color:#f5a524" data-i18n="orderTitle"></div>
-          <div class="font-bold text-sm" data-i18n="orderMain"></div>
-          <div class="mute mt-1 leading-relaxed" data-i18n="orderDesc"></div>
-        </div>
-        <div class="p-3 rounded-md" style="background:#0e121a;border:1px solid var(--line)">
-          <div class="mute mb-1" data-i18n="refTitle"></div>
-          <div class="space-y-0.5">
-            <div><span data-i18n="plEntry"></span>：<b id="rkEntry">—</b></div>
-            <div><span data-i18n="plStop"></span>：<b id="rkStop">—</b></div>
-            <div><span data-i18n="plTarget"></span>：<b id="rkTarget">—</b></div>
-            <div><span data-i18n="plSize"></span>：<b id="rkSize">—</b></div>
+        <div id="picksList" class="picks-list"></div>
+        <div class="disclaimer" data-i18n="picksDisclaimer"></div>
+      </section>
+
+      <section class="risk" id="riskCard">
+        <div class="sel-head">
+          <div>
+            <div class="sel-id">
+              <span id="selSym" class="sel-sym">—</span>
+              <span id="selPrice" class="sel-px"></span>
+              <span id="selChg"></span>
+            </div>
+            <div id="selName" class="sel-name"></div>
           </div>
-          <div id="rkRiskLine" class="mute mt-1 text-[10px]"></div>
-          <div class="mute mt-1 text-[10px]" data-i18n="refNote"></div>
+          <div class="sel-actions">
+            <span id="sessionBadge" class="sess-badge"></span>
+            <button id="btnCopy" class="btn" type="button" disabled data-i18n="copyBtn"></button>
+          </div>
         </div>
-      </div>
 
-      <ul class="mute text-[11px] mt-3 space-y-1 list-disc pl-5">
-        <li data-i18n="tip1"></li>
-        <li data-i18n="tip2"></li>
-        <li data-i18n="tip3"></li>
-      </ul>
+        <h3><i></i><span data-i18n="riskTitle"></span></h3>
+
+        <div class="info">
+          <div class="box">
+            <div class="ttl" data-i18n="liqTitle"></div>
+            <div id="liqLevel" class="big">—</div>
+            <div id="liqMeter" class="meter" data-lvl=""><i></i><i></i><i></i></div>
+            <div id="liqNote" class="note"></div>
+          </div>
+          <div class="box warn">
+            <div class="ttl" data-i18n="orderTitle"></div>
+            <div class="big" data-i18n="orderMain"></div>
+            <div class="note" data-i18n="orderDesc"></div>
+          </div>
+          <div class="box">
+            <div class="ttl" data-i18n="refTitle"></div>
+            <div class="kv"><span class="muted" data-i18n="plEntry"></span><b id="rkEntry" class="c-entry">—</b></div>
+            <div class="kv"><span class="muted" data-i18n="plStop"></span><b id="rkStop" class="c-stop">—</b></div>
+            <div class="kv"><span class="muted" data-i18n="plTarget"></span><b id="rkTarget" class="c-target">—</b></div>
+            <div class="kv"><span class="muted" data-i18n="plSize"></span><b id="rkSize" class="c-size">—</b></div>
+            <div id="rkRiskLine" class="note"></div>
+            <div class="note" style="font-size:11.5px" data-i18n="refNote"></div>
+          </div>
+        </div>
+
+        <ul class="tips">
+          <li data-i18n="tip1"></li>
+          <li data-i18n="tip2"></li>
+          <li data-i18n="tip3"></li>
+        </ul>
+      </section>
     </div>
-  </section>
+  </div>
 </main>
 
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <script>
 /* =====================================================================
@@ -257,6 +453,8 @@ const I18N = {
     activesFail:'「最活跃」榜单获取失败，仅使用涨幅榜：{msg}',
     earlyTag:' · 提前收市',
     sessHoliday:'休市（美股假日）',
+    stripTitle:'纽约时间', segPre:'盘前', segOpen:'开盘', segReg:'盘中', segAfter:'盘后',
+    stripWide:'这个时段点差通常偏宽，成交价可能偏离报价', stripTight:'盘中通常是点差较窄的时段', stripClosed:'目前休市，数据来自上一个交易时段',
     picksTitle:'建议入手', picksSub:'Top 5 · 规则打分，非预测',
     pCap:'本金 $', pRisk:'单笔风险 %', pStop:'止损幅度 %', pRR:'盈亏比 R:R', pPull:'挂单回踩 %', pCost:'往返点差 %',
     picksEmpty:'暂无候选：请先点「手动刷新」，或放宽左侧筛选条件',
@@ -332,6 +530,8 @@ const I18N = {
     activesFail:'"Most actives" list failed; using gainers only: {msg}',
     earlyTag:' · early close',
     sessHoliday:'Closed (US market holiday)',
+    stripTitle:'New York time', segPre:'Pre', segOpen:'Open', segReg:'Regular', segAfter:'After',
+    stripWide:'Spreads usually run wider now — fills can drift from the quote', stripTight:'Spreads are usually tighter mid-session', stripClosed:'Market closed — data reflects the last session',
     picksTitle:'Suggested Entries', picksSub:'Top 5 · rule-based score, not a forecast',
     pCap:'Capital $', pRisk:'Risk per trade %', pStop:'Stop distance %', pRR:'Reward : Risk', pPull:'Entry pullback %', pCost:'Round-trip spread %',
     picksEmpty:'No candidates yet — click "Refresh Data" or loosen the filters on the left',
@@ -393,6 +593,7 @@ const $ = id => document.getElementById(id);
 const fmt = (n, d=2) => (n==null||isNaN(n)) ? '—' : Number(n).toFixed(d);
 const fmtVol = v => v==null ? '—' : v>=1e6 ? (v/1e6).toFixed(2)+'M' : v>=1e3 ? (v/1e3).toFixed(0)+'K' : String(v);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hue = sym => { let h = 0; for(const c of String(sym)) h = (h*31 + c.charCodeAt(0)) % 360; return h; };
 const lsGet = (k, def=null) => { try { const v = localStorage.getItem(k); return v==null?def:JSON.parse(v); } catch { return def; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} };
 const utcDay = () => new Date().toISOString().slice(0,10);
@@ -419,7 +620,7 @@ function renderQuota(){
   $('quotaText').textContent = `${q.used} / ${DAILY_LIMIT}`;
   $('quotaLeft').textContent = left;
   const bar = $('quotaBar'); bar.style.width = pct+'%';
-  bar.style.background = pct>85 ? 'var(--down)' : pct>60 ? '#f5a524' : 'var(--up)';
+  bar.style.background = pct>85 ? 'var(--coral)' : pct>60 ? 'var(--amber)' : 'linear-gradient(90deg,var(--mint),var(--sky))';
 }
 function addQuota(n=1){ const q = quota(); q.used += n; lsSet(LS.quota, q); renderQuota(); }
 
@@ -520,7 +721,7 @@ function renderScan(){
   const meta = $('scanMeta');
   if(state.scanTs){
     const mins = Math.round((Date.now()-state.scanTs)/60000);
-    const tag = state.live ? `<span style="color:#f97316">● ${t('tagLive')}</span>` : `<span style="color:#4aa3ff">● ${t('tagMock')}</span>`;
+    const tag = state.live ? `<span class="tag-live">● ${t('tagLive')}</span>` : `<span class="tag-mock">● ${t('tagMock')}</span>`;
     let html = t('scanMeta', {
       tag, time: new Date(state.scanTs).toLocaleTimeString(locale()),
       ago: mins<1 ? t('justNow') : t('minsAgo',{m:mins}), n: state.raw.length
@@ -531,28 +732,34 @@ function renderScan(){
         if(state.rvolOn && state.rvolFrac<1) notes.push(t('rvolAdjMeta',{p:Math.round(state.rvolFrac*100)}) + (state.rvolFloor ? ' '+t('rvolEarlyNote') : ''));
         else notes.push(t('rvolRawMeta'));
       }
-      if(mins>=15 && ['pre','open','regular','after'].includes(etSession().key)) notes.push(`<span style="color:#f5a524">${t('staleWarn',{m:mins})}</span>`);
+      if(mins>=15 && ['pre','open','regular','after'].includes(etSession().key)) notes.push(`<span class="warn-txt">${t('staleWarn',{m:mins})}</span>`);
     }
     if(notes.length) html += '<br>' + notes.join('<br>');
     meta.innerHTML = html;
   } else meta.textContent = t('notLoaded');
   const list = $('scanList');
-  if(!rows.length){ list.innerHTML = `<div class="p-6 text-center mute text-xs">${state.raw.length ? t('noMatch') : t('noData')}</div>`; return; }
-  list.innerHTML = rows.map(r => `
-    <div class="row px-3 py-2.5 ${state.selected?.symbol===r.symbol?'active':''}" data-sym="${esc(r.symbol)}">
-      <div class="flex items-center justify-between">
-        <span class="font-bold">${esc(r.symbol)}</span>
-        <span class="up font-bold">+${fmt(r.changePct)}%</span>
-      </div>
-      <div class="flex items-center justify-between text-[11px] mute mt-0.5">
-        <span class="truncate max-w-[160px]">${esc(r.name)}</span>
-        <span>$${fmt(r.price)}</span>
-      </div>
-      <div class="flex items-center gap-2 text-[11px] mt-1">
-        <span class="badge ${r.rvol==null?'mute':'up'}" title="${r.rvolRaw!=null ? 'raw '+fmt(r.rvolRaw,2)+'×' : ''}">RVOL ${r.rvol==null ? (isBlocked(r.symbol) ? t('rvolBlocked') : t('rvolNA')) : (r.rvol>=100 ? '99x+' : fmt(r.rvol,1)+'x')}</span>
-        <span class="mute">Vol ${fmtVol(r.volume)}</span>
-      </div>
-    </div>`).join('');
+  if(!rows.length){ list.innerHTML = `<div class="empty">${state.raw.length ? t('noMatch') : t('noData')}</div>`; return; }
+  list.innerHTML = rows.map(r => {
+    const rv = r.rvol, up = r.changePct>=0;
+    const rvCls = rv==null ? (isBlocked(r.symbol) ? 'pill-bad' : 'pill-mute') : rv>=50 ? 'pill-warn' : rv>=2 ? 'pill-up' : 'pill-mute';
+    const rvTxt = rv==null ? (isBlocked(r.symbol) ? t('rvolBlocked') : t('rvolNA')) : (rv>=100 ? '99x+' : fmt(rv,1)+'x');
+    return `
+    <button type="button" class="row ${state.selected?.symbol===r.symbol?'active':''}" data-sym="${esc(r.symbol)}">
+      <span class="avatar" style="--h:${hue(r.symbol)}">${esc(String(r.symbol).slice(0,2))}</span>
+      <span class="row-main">
+        <span class="sym">${esc(r.symbol)}</span>
+        <span class="nm muted">${esc(r.name)}</span>
+        <span class="row-chips">
+          <span class="pill ${rvCls}" title="${r.rvolRaw!=null ? 'raw '+fmt(r.rvolRaw,2)+'×' : ''}">RVOL ${rvTxt}</span>
+          <span class="muted">Vol ${fmtVol(r.volume)}</span>
+        </span>
+      </span>
+      <span class="row-side">
+        <span class="px">$${fmt(r.price)}</span>
+        <span class="pill ${up?'pill-up':'pill-down'}">${up?'+':''}${fmt(r.changePct)}%</span>
+      </span>
+    </button>`;
+  }).join('');
   list.querySelectorAll('.row').forEach(el => el.onclick = () => selectStock(el.dataset.sym));
 }
 
@@ -564,15 +771,15 @@ function sessionInfo(date){
   const g = ty => p.find(x=>x.type===ty).value;
   const day = `${g('year')}-${g('month')}-${g('day')}`, wd = g('weekday'), min = (+g('hour')%24)*60 + +g('minute');
   const base = { min, day, closeMin:960 };
-  if(wd==='Sat'||wd==='Sun') return { ...base, key:'closed', label:t('sessWeekend'), color:'#7a8599' };
-  if(US_HOLIDAYS[day])        return { ...base, key:'closed', label:t('sessHoliday'), color:'#7a8599' };
+  if(wd==='Sat'||wd==='Sun') return { ...base, key:'closed', label:t('sessWeekend'), color:'#a09dc8' };
+  if(US_HOLIDAYS[day])        return { ...base, key:'closed', label:t('sessHoliday'), color:'#a09dc8' };
   const early = !!US_EARLY_CLOSE[day], closeMin = early ? 780 : 960, afterEnd = early ? 1020 : 1200, tag = early ? t('earlyTag') : '';
   const o = { ...base, closeMin };
-  if(min>=240 && min<570)        return { ...o, key:'pre',     label:t('sessPre'),     color:'#f5a524' };
-  if(min>=570 && min<585)        return { ...o, key:'open',    label:t('sessOpen')+tag, color:'#ff8a3d' };
-  if(min>=585 && min<closeMin)   return { ...o, key:'regular', label:t('sessRegular')+tag, color:'#26d98b' };
-  if(min>=closeMin && min<afterEnd) return { ...o, key:'after', label:t('sessAfter'),   color:'#f5a524' };
-  return { ...o, key:'closed', label:t('sessClosed'), color:'#7a8599' };
+  if(min>=240 && min<570)        return { ...o, key:'pre',     label:t('sessPre'),     color:'#ffb547' };
+  if(min>=570 && min<585)        return { ...o, key:'open',    label:t('sessOpen')+tag, color:'#ff8a5c' };
+  if(min>=585 && min<closeMin)   return { ...o, key:'regular', label:t('sessRegular')+tag, color:'#34e0a1' };
+  if(min>=closeMin && min<afterEnd) return { ...o, key:'after', label:t('sessAfter'),   color:'#ffb547' };
+  return { ...o, key:'closed', label:t('sessClosed'), color:'#a09dc8' };
 }
 const etSession = () => sessionInfo(new Date());
 const isOffHours = ses => ['pre','after','open'].includes(ses.key);
@@ -616,9 +823,9 @@ function liquidityEstimate(s, ses){
   if(s.marketCap>0){ if(s.marketCap<5e7) score += 2; else if(s.marketCap<3e8) score += 1; }   // 极小市值：点差/停牌风险更高
   if(isOffHours(ses)) score += 2;
   if(ses.key==='closed') score += 1;
-  if(score >= 5) return { lvl:'bad',  lv:t('liqBad'),  color:'var(--down)', note:t('liqBadNote') };
-  if(score >= 3) return { lvl:'mid',  lv:t('liqMid'),  color:'#f5a524',     note:t('liqMidNote') };
-  return               { lvl:'good', lv:t('liqGood'), color:'var(--up)',   note:t('liqGoodNote') };
+  if(score >= 5) return { lvl:'bad',  lv:t('liqBad'),  color:'var(--coral)', note:t('liqBadNote') };
+  if(score >= 3) return { lvl:'mid',  lv:t('liqMid'),  color:'#ffb547',     note:t('liqMidNote') };
+  return               { lvl:'good', lv:t('liqGood'), color:'var(--mint)',  note:t('liqGoodNote') };
 }
 
 /* 规则打分（0–100）：涨幅 35 + RVOL 30 + 成交量 20 + 价格区间 10，归一化后扣除时段惩罚 */
@@ -681,7 +888,7 @@ const usd = n => '$'+Number(n).toFixed(2);
 /* =====================================================================
  *  ⭐ 建议入手区
  * ===================================================================== */
-const TONE = { good:'#26d98b', warn:'#f5a524', bad:'#ff5c6c', neutral:'#7a8599' };
+const TONE = { good:'#34e0a1', warn:'#ffb547', bad:'#ff6b7a', neutral:'#a09dc8' };
 
 function renderPicks(){
   const ses = etSession();
@@ -690,42 +897,40 @@ function renderPicks(){
   $('enrichHint').textContent = state.live && rows.some(r => r.s.rvol==null) ? t('enrichHint') : '';
   $('btnEnrich').disabled = !state.live;
   const box = $('picksList');
-  if(!rows.length){ box.innerHTML = `<div class="p-4 text-center mute text-xs">${t('picksEmpty')}</div>`; return; }
-  const G = { strong:{txt:t('gradeStrong'),color:'#26d98b'}, watch:{txt:t('gradeWatch'),color:'#f5a524'}, skip:{txt:t('gradeSkip'),color:'#7a8599'} };
+  if(!rows.length){ box.innerHTML = `<div class="empty">${t('picksEmpty')}</div>`; return; }
+  const G = { strong:{txt:t('gradeStrong'),color:'#34e0a1'}, watch:{txt:t('gradeWatch'),color:'#ffb547'}, skip:{txt:t('gradeSkip'),color:'#a09dc8'} };
   box.innerHTML = rows.map((r,i) => {
-    const s = r.s, g = G[r.grade], pl = tradePlan(s);
-    const chips = r.reasons.map(x => `<span class="badge" style="color:${TONE[x.tone]};border-color:${TONE[x.tone]}55">${esc(x.txt)}</span>`).join(' ');
+    const s = r.s, g = G[r.grade], pl = tradePlan(s), up = s.changePct>=0;
+    const chips = r.reasons.map(x => `<span class="chip" style="--cc:${TONE[x.tone]}">${esc(x.txt)}</span>`).join('');
     const plan = pl.valid ? `
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] mt-2">
-        <div><div class="mute">${t('plEntry')}</div><b>${usd(pl.entry)}</b></div>
-        <div><div class="mute">${t('plStop')}</div><b class="down">${usd(pl.stopPx)}</b></div>
-        <div><div class="mute">${t('plTarget')}</div><b class="up">${usd(pl.target)}</b></div>
-        <div><div class="mute">${t('plSize')}</div><b>$${Math.round(pl.pos)}</b> <span class="mute">${t('plUnits',{u:fmt(pl.units,2)})}</span></div>
+      <div class="plan">
+        <div class="tile t-entry"><small>${t('plEntry')}</small><b>${usd(pl.entry)}</b></div>
+        <div class="tile t-stop"><small>${t('plStop')}</small><b>${usd(pl.stopPx)}</b></div>
+        <div class="tile t-target"><small>${t('plTarget')}</small><b>${usd(pl.target)}</b></div>
+        <div class="tile t-size"><small>${t('plSize')}</small><b>$${Math.round(pl.pos)}</b> <span class="muted">${t('plUnits',{u:fmt(pl.units,2)})}</span></div>
       </div>
-      <div class="mute text-[10px] mt-1">${t('plRiskLine',{risk:fmt(pl.riskUsd,2), gain:fmt(pl.gainUsd,2)})} ${pl.capped?t('plCapped'):''}</div>`
-      : `<div class="mute text-[11px] mt-2">${t('plInvalid')}</div>`;
+      <p class="plan-note">${t('plRiskLine',{risk:fmt(pl.riskUsd,2), gain:fmt(pl.gainUsd,2)})} ${pl.capped?t('plCapped'):''}</p>`
+      : `<p class="plan-note">${t('plInvalid')}</p>`;
     return `
-    <div class="pick p-3 ${state.selected?.symbol===s.symbol?'sel':''}" data-sym="${esc(s.symbol)}">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <div class="flex items-baseline gap-2">
-          <span class="mute text-xs">#${i+1}</span>
-          <b class="text-base">${esc(s.symbol)}</b>
-          <span class="up text-xs font-bold">+${fmt(s.changePct)}%</span>
-          <span class="mute text-xs">$${fmt(s.price)}</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="badge" style="color:${g.color};border-color:${g.color}66">${g.txt}</span>
-          <span class="text-xs mute">${t('score')} <b style="color:${g.color}">${r.score}</b></span>
-          <button class="btn pcopy" style="padding:2px 8px" data-sym="${esc(s.symbol)}">📋</button>
-        </div>
+    <div class="pick ${state.selected?.symbol===s.symbol?'sel':''}" style="--gc:${g.color}" tabindex="0" role="button" data-sym="${esc(s.symbol)}">
+      <div class="pick-head">
+        <span class="rank">${i+1}</span>
+        <span class="avatar" style="--h:${hue(s.symbol)}">${esc(String(s.symbol).slice(0,2))}</span>
+        <div class="pick-id"><b>${esc(s.symbol)}</b><span class="nm muted">${esc(s.name)}</span></div>
+        <div class="pick-px"><span class="px">$${fmt(s.price)}</span><span class="pill ${up?'pill-up':'pill-down'}">${up?'+':''}${fmt(s.changePct)}%</span></div>
+        <div class="ring" style="--p:${r.score};--c:${g.color}" title="${t('score')} ${r.score}"><span>${r.score}</span></div>
       </div>
-      <div class="mute text-[11px] truncate">${esc(s.name)}</div>
-      <div class="h-1 rounded mt-2 overflow-hidden" style="background:#222a39"><div class="h-full" style="width:${r.score}%;background:${g.color}"></div></div>
-      <div class="flex flex-wrap gap-1 mt-2">${chips}</div>
+      <div class="pick-meta">
+        <span class="grade" style="--cc:${g.color}">${g.txt}</span>${chips}
+        <button type="button" class="btn btn-sm pcopy" data-sym="${esc(s.symbol)}" aria-label="${t('copyBtn')}">📋</button>
+      </div>
       ${plan}
     </div>`;
   }).join('');
-  box.querySelectorAll('.pick').forEach(el => el.onclick = () => selectStock(el.dataset.sym, true));
+  box.querySelectorAll('.pick').forEach(el => {
+    el.onclick = () => selectStock(el.dataset.sym, true);
+    el.onkeydown = e => { if(e.target===el && (e.key==='Enter' || e.key===' ')){ e.preventDefault(); selectStock(el.dataset.sym, true); } };
+  });
   box.querySelectorAll('.pcopy').forEach(b => b.onclick = e => { e.stopPropagation(); copySym(b.dataset.sym); });
 }
 
@@ -812,9 +1017,34 @@ async function selectStock(sym, scroll=false){
   }
 }
 
+function renderStrip(){
+  const s = sessionInfo(new Date());
+  const start = 240, afterEnd = s.closeMin===780 ? 1020 : 1200, total = afterEnd - start;
+  const segs = [['pre',240,570,'segPre'],['open',570,585,'segOpen'],['regular',585,s.closeMin,'segReg'],['after',s.closeMin,afterEnd,'segAfter']];
+  $('sessBar').innerHTML = segs.map(([k,a,b,lab]) => `<i class="seg seg-${k} ${s.key===k?'cur':''}" style="flex:${b-a}"><em>${(b-a)>=60 ? t(lab) : ''}</em></i>`).join('');
+  const hh = String(Math.floor(s.min/60)).padStart(2,'0'), mm = String(s.min%60).padStart(2,'0');
+  $('sessLabel').textContent = s.label;
+  $('sessClock').textContent = `${t('stripTitle')} ${hh}:${mm}`;
+  $('sessDot').style.setProperty('--dot', s.color);
+  $('sessNote').textContent = s.key==='regular' ? t('stripTight') : s.key==='closed' ? t('stripClosed') : t('stripWide');
+  const fmtT = m => `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`;
+  const ticks = [[240,0],[570,(570-start)/total*100],[s.closeMin,(s.closeMin-start)/total*100],[afterEnd,100]];
+  $('sessTicks').innerHTML = ticks.map(([m,p]) => `<span style="left:${p}%">${fmtT(m)}</span>`).join('');
+  const now = $('sessNow'), live = ['pre','open','regular','after'].includes(s.key);
+  now.classList.toggle('off', !live);
+  $('sessTrack').setAttribute('aria-label', `${s.label} ${hh}:${mm} ET`);
+  if(live){
+    const pos = Math.max(0, Math.min(100, (s.min-start)/total*100));
+    $('sessNowTime').textContent = `${hh}:${mm}`;
+    now.classList.toggle('edge-l', pos<9); now.classList.toggle('edge-r', pos>91);
+    if(!renderStrip.done){ now.style.setProperty('--p','0%'); requestAnimationFrame(() => requestAnimationFrame(() => now.style.setProperty('--p', pos+'%'))); renderStrip.done = true; }
+    else now.style.setProperty('--p', pos+'%');
+  }
+}
 function renderSession(){
   const ses = etSession(), sb = $('sessionBadge');
-  sb.textContent = ses.label; sb.style.color = ses.color; sb.style.borderColor = ses.color;
+  sb.textContent = ses.label; sb.style.color = ses.color;
+  renderStrip();
   return ses;
 }
 
@@ -824,16 +1054,16 @@ function renderSelected(){
     $('selSym').textContent = '—'; $('selPrice').textContent = ''; $('selChg').textContent = '';
     $('selName').textContent = t('selectHint');
     ['liqLevel','rkEntry','rkStop','rkTarget','rkSize'].forEach(id => { $(id).textContent = '—'; });
-    $('liqLevel').style.color = ''; $('liqNote').textContent = ''; $('rkRiskLine').textContent = '';
+    $('liqLevel').style.color = ''; $('liqNote').textContent = ''; $('rkRiskLine').textContent = ''; $('liqMeter').dataset.lvl = '';
     $('btnCopy').disabled = true;
     return;
   }
   $('selSym').textContent = s.symbol;
   $('selPrice').textContent = '$'+fmt(s.price);
-  $('selChg').innerHTML = `<span class="${s.changePct>=0?'up':'down'}">${s.changePct>=0?'+':''}${fmt(s.changePct)}%</span>`;
+  $('selChg').innerHTML = `<span class="pill ${s.changePct>=0?'pill-up':'pill-down'}" style="font-size:13px">${s.changePct>=0?'+':''}${fmt(s.changePct)}%</span>`;
   $('selName').textContent = s.name + (s.rvol!=null ? ` · RVOL ${fmt(s.rvol,1)}x` : '');
   const est = liquidityEstimate(s, ses);
-  $('liqLevel').textContent = est.lv; $('liqLevel').style.color = est.color;
+  $('liqLevel').textContent = est.lv; $('liqLevel').style.color = est.color; $('liqMeter').dataset.lvl = est.lvl;
   $('liqNote').textContent = est.note + (isOffHours(ses) ? t('offHours') : '');
   const pl = tradePlan(s);
   if(pl.valid){
@@ -860,11 +1090,9 @@ async function copySym(sym){
 function renderAll(){ applyRvol(); renderScan(); renderPicks(); renderSelected(); }
 
 function renderMode(){
-  $('modeSwitch').classList.toggle('live', state.live);
-  $('modeMock').className = state.live ? 'mute' : 'font-bold';
-  $('modeLive').className = state.live ? 'font-bold' : 'mute';
-  $('modeLive').style.color = state.live ? '#f97316' : '';
-  $('modeMock').style.color = state.live ? '' : '#4aa3ff';
+  $('modeMock').classList.toggle('on', !state.live);
+  $('modeLive').classList.toggle('on', state.live);
+  $('modeSwitch').setAttribute('aria-checked', state.live ? 'true' : 'false');
 }
 function setMode(live){
   if(live && !getKey()){ toast(t('needKey'), 4500); $('keyBar').classList.remove('hidden'); return; }
@@ -897,6 +1125,7 @@ function setLang(l){
 
 $('langSel').onchange = e => setLang(e.target.value);
 $('modeSwitch').onclick = () => setMode(!state.live);
+$('modeSwitch').onkeydown = e => { if(e.key==='Enter' || e.key===' '){ e.preventDefault(); setMode(!state.live); } };
 $('btnRefresh').onclick = refreshScan;
 $('btnCopy').onclick = () => copySym(state.selected?.symbol);
 $('btnEnrich').onclick = enrichTop;
@@ -913,6 +1142,7 @@ $('rvolAdj').checked = lsGet(LS.rvolAdj, true) !== false;
 if(state.live && !getKey()) state.live = false;
 applyLang();
 setMode(state.live);
+setInterval(renderSession, 30000);
 
 /* PWA：注册 Service Worker（仅 https / localhost 生效） */
 if('serviceWorker' in navigator){ window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{})); }

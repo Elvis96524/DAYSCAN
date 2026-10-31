@@ -1,6 +1,6 @@
 # DayScan · 美股日内交易扫描器
 
-单文件 HTML 应用（Tailwind CDN + TradingView Lightweight Charts），数据来自 FMP 免费 API，面向 eToro 交易者。支持安装到手机主屏幕（PWA）。
+单文件 HTML 应用（纯原生 CSS/JS，无外部依赖），数据来自 FMP 免费 API，面向 eToro 交易者。支持安装到手机主屏幕（PWA）。
 
 ## 文件清单
 
@@ -94,4 +94,4 @@ git push -u origin main
 - 「私密 Gist」不是加密，知道链接的人能看到内容。所以默认不同步 API Key；如要勾选，请知晓这个风险。更稳妥的做法是在每台设备上各自输入一次 Key。
 - 令牌权限很大程度等同于你的 Gist 读写权，不要截图或发给别人；怀疑泄露就到 GitHub 里删除该令牌。
 - 没法联网或不想用 GitHub 时，可用「导出 JSON / 导入 JSON」手动传文件（例如发到微信文件传输助手）。
-- 更新应用后记得把 `sw.js` 里的版本号加 1（目前是 `dayscan-v6`）。
+- 更新应用后记得把 `sw.js` 里的版本号加 1（目前是 `dayscan-v7`）。
