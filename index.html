@@ -103,7 +103,8 @@
         <label><span data-i18n="fMin"></span><input id="fMin" type="number" step="0.5" value="1"></label>
         <label><span data-i18n="fMax"></span><input id="fMax" type="number" step="1" value="50"></label>
       </div>
-      <div class="mute text-[10px] mt-2" data-i18n="filterHint"></div>
+      <label class="flex items-center gap-2 text-[11px] mt-2 cursor-pointer"><input id="rvolAdj" type="checkbox" checked style="width:auto"><span data-i18n="rvolAdjLabel"></span></label>
+      <div class="mute text-[10px] mt-1" data-i18n="filterHint"></div>
     </div>
     <div id="scanList" class="flex-1 overflow-y-auto text-sm"></div>
     <div class="px-3 py-2 border-t mute text-[10px]" style="border-color:var(--line)" data-i18n="scanFoot"></div>
@@ -119,11 +120,13 @@
         <span class="mute text-[10px]" data-i18n="picksSub"></span>
       </div>
 
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] my-3">
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 text-[11px] my-3">
         <label><span data-i18n="pCap"></span><input id="pCap" type="number" min="1" step="50" value="1000"></label>
         <label><span data-i18n="pRisk"></span><input id="pRisk" type="number" min="0.1" step="0.25" value="1"></label>
         <label><span data-i18n="pStop"></span><input id="pStop" type="number" min="0.5" step="0.5" value="3"></label>
         <label><span data-i18n="pRR"></span><input id="pRR" type="number" min="0.5" step="0.5" value="2"></label>
+        <label><span data-i18n="pPull"></span><input id="pPull" type="number" min="0" step="0.1" value="0.5"></label>
+        <label><span data-i18n="pCost"></span><input id="pCost" type="number" min="0" step="0.1" value="0.3"></label>
       </div>
 
       <div id="picksList" class="space-y-2"></div>
@@ -197,8 +200,19 @@ const FMP_API_KEY = 'YOUR_FMP_API_KEY';
 const FMP_BASE   = 'https://financialmodelingprep.com/stable';
 const DAILY_LIMIT = 250;
 const TOP_N = 5;                 // 「建议入手」展示前几名
-const ENTRY_PULLBACK = 0.005;    // 挂单价 = 现价下方 0.5%（不追高）
-const LS = { quota:'dt_quota', mode:'dt_mode', key:'dt_key', scan:'dt_scan_cache', lang:'dt_lang', risk:'dt_risk' };
+const LS = { quota:'dt_quota', mode:'dt_mode', key:'dt_key', scan:'dt_scan_cache', lang:'dt_lang', risk:'dt_risk', rvolAdj:'dt_rvol_adj' };
+
+/* 美股休市日 / 提前收市日（13:00 ET）。2026 为官方日历；2027 为按规则推算，请每年对照 NYSE 官方日历核对。 */
+const US_HOLIDAYS = {
+  '2026-01-01':1,'2026-01-19':1,'2026-02-16':1,'2026-04-03':1,'2026-05-25':1,'2026-06-19':1,'2026-07-03':1,'2026-09-07':1,'2026-11-26':1,'2026-12-25':1,
+  '2027-01-01':1,'2027-01-18':1,'2027-02-15':1,'2027-03-26':1,'2027-05-31':1,'2027-06-18':1,'2027-07-05':1,'2027-09-06':1,'2027-11-25':1,'2027-12-24':1
+};
+const US_EARLY_CLOSE = { '2026-11-27':1, '2026-12-24':1, '2027-11-26':1 };
+
+/* 日内累计成交量占全天比例（常见的 U 形曲线近似值；横轴=开盘后分钟数，纵轴=累计占比）。
+ * 这是经验近似，不同股票/不同日子会有差异，用于把「当前成交量」折算成「全天预期」。 */
+const VOL_CURVE = [[0,0],[15,0.08],[30,0.15],[60,0.25],[90,0.32],[120,0.38],[150,0.43],[180,0.48],[210,0.54],[240,0.59],[270,0.65],[300,0.72],[330,0.80],[360,0.89],[390,1]];
+const VOL_FLOOR = 0.08;          // 盘前 / 开盘前 15 分钟统一按 8% 估算，避免除以极小数
 
 /* =====================================================================
  *  多语言 / i18n
@@ -218,14 +232,23 @@ const I18N = {
     fChg:'涨幅 > %', fRvol:'RVOL >', fMin:'价格 ≥ $', fMax:'价格 ≤ $',
     filterHint:'修改筛选条件只在本地重新过滤缓存数据，不消耗 API。',
     scanFoot:'点击股票 → 查看风控卡片与交易计划（纯本地计算，不消耗 API）',
+    rvolAdjLabel:'RVOL 按交易时间折算（推荐）',
+    rvolAdjMeta:'RVOL 已按时间折算：预计此时已完成约 {p}% 的全天成交量',
+    rvolRawMeta:'RVOL = 当前成交量 ÷ 平均成交量（未折算）',
+    rvolEarlyNote:'盘前/开盘前15分钟按 8% 估算，仅供参考。',
+    staleWarn:'⚠ 数据已是 {m} 分钟前，价格与 RVOL 可能已变化，建议重新刷新',
+    rvolMissing:'批量报价里没有成交量/平均成交量字段，RVOL 无法计算；这些股票评级最高为「可关注」',
+    activesFail:'「最活跃」榜单获取失败，仅使用涨幅榜：{msg}',
+    earlyTag:' · 提前收市',
+    sessHoliday:'休市（美股假日）',
     picksTitle:'建议入手', picksSub:'Top 5 · 规则打分，非预测',
-    pCap:'本金 $', pRisk:'单笔风险 %', pStop:'止损幅度 %', pRR:'盈亏比 R:R',
+    pCap:'本金 $', pRisk:'单笔风险 %', pStop:'止损幅度 %', pRR:'盈亏比 R:R', pPull:'挂单回踩 %', pCost:'往返点差 %',
     picksEmpty:'暂无候选：请先点「手动刷新」，或放宽左侧筛选条件',
     picksDisclaimer:'排序只看涨幅、RVOL、成交量、价格和交易时段，不预测涨跌，也不是投资建议。挂单价、止损、目标和仓位都由上方参数机械计算；点差、盘口和消息面请在 eToro 内自行核实。',
     gradeStrong:'较强', gradeWatch:'可关注', gradeSkip:'观望', score:'评分',
     plEntry:'挂单限价', plStop:'止损', plTarget:'目标', plSize:'建议仓位',
     plUnits:'≈ {u} 股', plCapped:'（已按本金封顶，不用杠杆）',
-    plRiskLine:'最大亏损 ≈ ${risk}，到达目标 ≈ +${gain}',
+    plRiskLine:'最大亏损 ≈ ${risk}（已含点差），到达目标净盈利 ≈ +${gain}',
     plInvalid:'请在上方填写有效的本金、风险、止损和盈亏比',
     rsnMomOk:'涨幅 +{v}%', rsnMomHot:'涨幅 +{v}% 过大，谨防追高', rsnMomWeak:'涨幅仅 +{v}%',
     rsnRvolHigh:'明显放量 {v}×', rsnRvolOk:'RVOL {v}×', rsnRvolLow:'RVOL 偏低 {v}×', rsnRvolNA:'RVOL 未知',
@@ -237,7 +260,7 @@ const I18N = {
     orderTitle:'⚠ 订单类型', orderMain:'务必使用「限价单 Limit Order」进场',
     orderDesc:'市价单在高波动小盘股上容易严重滑点；eToro 点差本身已含成本，进场价请手动设定并设置止损。',
     refTitle:'参考交易计划（机械计算）',
-    refNote:'挂单价 = 现价下方 0.5% 的回踩价；其余由「建议入手」区的参数计算，非投资建议。',
+    refNote:'挂单价 = 现价 ×（1 − 回踩%）；止损、目标、仓位按「建议入手」区的参数计算，点差是你填的估算值，请以 eToro 实时买卖价为准。非投资建议。',
     tip1:'盘前 / 盘后及开盘前几分钟，eToro 点差可能明显拉大，成交价会偏离图表价格。',
     tip2:'eToro 对美股通常以其做市价格执行，且可能有非交易时段限制，请以平台内实际报价为准。',
     tip3:'日内交易亏损风险高；合理设置止损，避免杠杆放大损失。',
@@ -273,14 +296,23 @@ const I18N = {
     fChg:'Change > %', fRvol:'RVOL >', fMin:'Price ≥ $', fMax:'Price ≤ $',
     filterHint:'Changing filters only re-filters cached data locally — no API calls.',
     scanFoot:'Click a stock → see its risk card and trade plan (computed locally, no API call)',
+    rvolAdjLabel:'Time-adjust RVOL (recommended)',
+    rvolAdjMeta:'RVOL time-adjusted: about {p}% of the full-day volume is expected by now',
+    rvolRawMeta:'RVOL = current volume ÷ average volume (not adjusted)',
+    rvolEarlyNote:'Pre-market / first 15 min assume 8% — rough guide only.',
+    staleWarn:'⚠ Data is {m} min old — prices and RVOL may have changed; consider refreshing',
+    rvolMissing:'Batch quote has no volume / average-volume fields, so RVOL cannot be computed; these stocks are capped at "Watch"',
+    activesFail:'"Most actives" list failed; using gainers only: {msg}',
+    earlyTag:' · early close',
+    sessHoliday:'Closed (US market holiday)',
     picksTitle:'Suggested Entries', picksSub:'Top 5 · rule-based score, not a forecast',
-    pCap:'Capital $', pRisk:'Risk per trade %', pStop:'Stop distance %', pRR:'Reward : Risk',
+    pCap:'Capital $', pRisk:'Risk per trade %', pStop:'Stop distance %', pRR:'Reward : Risk', pPull:'Entry pullback %', pCost:'Round-trip spread %',
     picksEmpty:'No candidates yet — click "Refresh Data" or loosen the filters on the left',
     picksDisclaimer:'Ranking only looks at change %, RVOL, volume, price and trading session. It does not predict direction and is not investment advice. Entry, stop, target and position size are computed mechanically from the inputs above; verify spread, order book and news inside eToro yourself.',
     gradeStrong:'Strong', gradeWatch:'Watch', gradeSkip:'Skip', score:'Score',
     plEntry:'Limit entry', plStop:'Stop', plTarget:'Target', plSize:'Position',
     plUnits:'≈ {u} sh', plCapped:'(capped at capital, no leverage)',
-    plRiskLine:'Max loss ≈ ${risk}, gain at target ≈ +${gain}',
+    plRiskLine:'Max loss ≈ ${risk} (spread included), net gain at target ≈ +${gain}',
     plInvalid:'Enter valid capital, risk, stop and R:R above',
     rsnMomOk:'Up +{v}%', rsnMomHot:'Up +{v}% — overextended, beware chasing', rsnMomWeak:'Only +{v}%',
     rsnRvolHigh:'Heavy volume {v}×', rsnRvolOk:'RVOL {v}×', rsnRvolLow:'RVOL low {v}×', rsnRvolNA:'RVOL N/A',
@@ -292,7 +324,7 @@ const I18N = {
     orderTitle:'⚠ Order Type', orderMain:'Always enter with a Limit Order',
     orderDesc:"Market orders can slip badly on volatile small caps. eToro's spread is already a cost, so set your entry price manually and use a stop loss.",
     refTitle:'Reference Trade Plan (mechanical)',
-    refNote:'Entry = 0.5% below last price; the rest follow the inputs in Suggested Entries. Not investment advice.',
+    refNote:'Entry = last price × (1 − pullback%); stop, target and size follow the inputs in Suggested Entries. The spread is your own estimate — use the live bid/ask in eToro. Not investment advice.',
     tip1:'In pre-market, after-hours and the first minutes after the open, eToro spreads can widen a lot and fills may differ from quoted prices.',
     tip2:"eToro usually executes US stocks at its own market-maker prices and may restrict off-hours trading — always rely on the quote inside the platform.",
     tip3:'Day trading carries a high risk of loss. Use a sensible stop loss and avoid leverage magnifying losses.',
@@ -348,7 +380,8 @@ const state = {
   live: lsGet(LS.mode, false) === true,   // 默认 false = 测试模式
   raw: [],            // 扫描原始数据（未过滤）
   scanTs: null,
-  selected: null
+  selected: null,
+  rvolOn: true, rvolFrac: 1, rvolFloor: false
 };
 
 /* ---------------------------- API 额度计数 ---------------------------- */
@@ -397,7 +430,7 @@ const MOCK_SCAN = [
   ['LOWV','LowVol Utilities',15.4,3.9,310000,280000],      // RVOL 不足 / RVOL too low
   ['FLAT','Flatline Corp',22.0,0.8,2600000,900000],        // 涨幅不足 / change too small
   ['PNNY','Penny Labs',0.62,25.0,31000000,2500000]         // 价格<1 / price < $1
-].map(([symbol,name,price,chg,volume,avgVolume])=>({symbol,name,price,changePct:chg,volume,avgVolume,rvol:+(volume/avgVolume).toFixed(2)}));
+].map(([symbol,name,price,chg,volume,avgVolume])=>({symbol,name,price,changePct:chg,volume,avgVolume,rvol:+(volume/avgVolume).toFixed(2),mock:true}));
 
 /* =====================================================================
  *  扫描数据加载（每次刷新 ≈ 3 次请求；选股与评分均为本地计算）
@@ -405,33 +438,37 @@ const MOCK_SCAN = [
 const num = v => (v==null||v==='') ? null : Number(v);
 
 async function loadScanLive(){
-  // 请求1+2：涨幅榜 + 最活跃榜
-  const [gainers, actives] = await Promise.all([ fmp('/biggest-gainers'), fmp('/most-actives') ]);
+  const warns = []; let batchFailed = false;
+  // 请求1+2：涨幅榜（核心）+ 最活跃榜（失败不影响主流程）
+  const [g, a] = await Promise.allSettled([ fmp('/biggest-gainers'), fmp('/most-actives') ]);
+  if(g.status==='rejected') throw g.reason;
+  if(a.status==='rejected') warns.push(t('activesFail',{msg:a.reason.message}));
+  const list = [ ...(Array.isArray(g.value)?g.value:[]), ...(a.status==='fulfilled' && Array.isArray(a.value) ? a.value : []) ];
   const map = new Map();
-  [...(gainers||[]), ...(actives||[])].forEach(r => {
+  list.forEach(r => {
     const sym = r.symbol; if(!sym || map.has(sym)) return;
-    map.set(sym, { symbol:sym, name:r.name||'', price:num(r.price), changePct:num(r.changesPercentage ?? r.changePercentage), volume:null, avgVolume:null, rvol:null });
+    map.set(sym, { symbol:sym, name:r.name||'', price:num(r.price), changePct:num(r.changesPercentage ?? r.changePercentage ?? r.changePercent), volume:null, avgVolume:null });
   });
-  // 预过滤（价格&涨幅）后再取量能数据，减少 batch 请求规模
+  // 预过滤（价格&涨幅，必须是有效数字）后再取量能数据，减少 batch 请求规模
   const fMin=+$('fMin').value, fMax=+$('fMax').value, fChg=+$('fChg').value;
-  let cands = [...map.values()].filter(r => r.price>=fMin && r.price<=fMax && r.changePct>fChg).slice(0,60);
-  // 请求3：批量报价 → 取 volume / avgVolume 计算 RVOL
+  const cands = [...map.values()].filter(r => Number.isFinite(r.price) && Number.isFinite(r.changePct) && r.price>=fMin && r.price<=fMax && r.changePct>fChg).slice(0,60);
+  // 请求3：批量报价 → 取 volume / avgVolume
   if(cands.length){
     try{
       const q = await fmp('/batch-quote', { symbols: cands.map(c=>c.symbol).join(',') });
-      const qm = new Map((q||[]).map(x=>[x.symbol,x]));
+      const qm = new Map((Array.isArray(q)?q:[]).map(x=>[x.symbol,x]));
       cands.forEach(c => {
         const x = qm.get(c.symbol); if(!x) return;
         c.price = num(x.price) ?? c.price;
         c.changePct = num(x.changePercentage ?? x.changesPercentage) ?? c.changePct;
-        c.volume = num(x.volume); c.avgVolume = num(x.avgVolume);
-        if(c.volume && c.avgVolume) c.rvol = +(c.volume/c.avgVolume).toFixed(2);
+        c.volume = num(x.volume); c.avgVolume = num(x.avgVolume ?? x.averageVolume);
       });
     }catch(e){
-      toast(t('batchFail',{msg:e.message}), 6000);
+      batchFailed = true;
+      warns.push(t('batchFail',{msg:e.message}));
     }
   }
-  return cands;
+  return { rows:cands, warns, batchFailed };
 }
 
 async function refreshScan(){
@@ -439,10 +476,13 @@ async function refreshScan(){
   try{
     if(state.live){
       if(!confirm(t('confirmRefresh',{used:quota().used, limit:DAILY_LIMIT}))) return;
-      state.raw = await loadScanLive();
+      const res = await loadScanLive();
+      state.raw = res.rows;
       state.scanTs = Date.now();
       lsSet(LS.scan, { ts:state.scanTs, rows:state.raw });
-      toast(t('refreshed'));
+      const warns = res.warns.slice();
+      if(state.raw.length && !res.batchFailed && !state.raw.some(r => r.volume>0 && r.avgVolume>0)) warns.push(t('rvolMissing'));
+      toast(t('refreshed') + (warns.length ? ' · ' + warns.join(' · ') : ''), warns.length ? 9000 : 3200);
     } else {
       await new Promise(r=>setTimeout(r,250));
       // 每次刷新在模拟数据上加一点随机扰动，便于调试 UI
@@ -470,10 +510,18 @@ function renderScan(){
   if(state.scanTs){
     const mins = Math.round((Date.now()-state.scanTs)/60000);
     const tag = state.live ? `<span style="color:#f97316">● ${t('tagLive')}</span>` : `<span style="color:#4aa3ff">● ${t('tagMock')}</span>`;
-    meta.innerHTML = t('scanMeta', {
+    let html = t('scanMeta', {
       tag, time: new Date(state.scanTs).toLocaleTimeString(locale()),
       ago: mins<1 ? t('justNow') : t('minsAgo',{m:mins}), n: state.raw.length
     });
+    const notes = [];
+    if(state.live){
+      if(state.rvolOn && state.rvolFrac<1) notes.push(t('rvolAdjMeta',{p:Math.round(state.rvolFrac*100)}) + (state.rvolFloor ? ' '+t('rvolEarlyNote') : ''));
+      else notes.push(t('rvolRawMeta'));
+      if(mins>=15 && ['pre','open','regular','after'].includes(etSession().key)) notes.push(`<span style="color:#f5a524">${t('staleWarn',{m:mins})}</span>`);
+    }
+    if(notes.length) html += '<br>' + notes.join('<br>');
+    meta.innerHTML = html;
   } else meta.textContent = t('notLoaded');
   const list = $('scanList');
   if(!rows.length){ list.innerHTML = `<div class="p-6 text-center mute text-xs">${state.raw.length ? t('noMatch') : t('noData')}</div>`; return; }
@@ -488,7 +536,7 @@ function renderScan(){
         <span>$${fmt(r.price)}</span>
       </div>
       <div class="flex items-center gap-2 text-[11px] mt-1">
-        <span class="badge ${r.rvol==null?'mute':'up'}">RVOL ${r.rvol==null?t('rvolNA'):fmt(r.rvol,1)+'x'}</span>
+        <span class="badge ${r.rvol==null?'mute':'up'}" title="${r.rvolRaw!=null ? 'raw '+fmt(r.rvolRaw,2)+'×' : ''}">RVOL ${r.rvol==null?t('rvolNA'):fmt(r.rvol,1)+'x'}</span>
         <span class="mute">Vol ${fmtVol(r.volume)}</span>
       </div>
     </div>`).join('');
@@ -498,17 +546,51 @@ function renderScan(){
 /* =====================================================================
  *  交易时段 / 流动性 / 评分 / 交易计划
  * ===================================================================== */
-function etSession(){
-  const p = new Intl.DateTimeFormat('en-US',{ timeZone:'America/New_York', weekday:'short', hour:'2-digit', minute:'2-digit', hour12:false }).formatToParts(new Date());
-  const g = ty => p.find(x=>x.type===ty).value, wd=g('weekday'), m = (+g('hour')%24)*60 + +g('minute');
-  if(wd==='Sat'||wd==='Sun') return { key:'closed', label:t('sessWeekend'), color:'#7a8599' };
-  if(m>=240 && m<570)  return { key:'pre',    label:t('sessPre'),     color:'#f5a524' };
-  if(m>=570 && m<585)  return { key:'open',   label:t('sessOpen'),    color:'#ff8a3d' };
-  if(m>=585 && m<960)  return { key:'regular',label:t('sessRegular'), color:'#26d98b' };
-  if(m>=960 && m<1200) return { key:'after',  label:t('sessAfter'),   color:'#f5a524' };
-  return { key:'closed', label:t('sessClosed'), color:'#7a8599' };
+function sessionInfo(date){
+  const p = new Intl.DateTimeFormat('en-US',{ timeZone:'America/New_York', year:'numeric', month:'2-digit', day:'2-digit', weekday:'short', hour:'2-digit', minute:'2-digit', hour12:false }).formatToParts(date);
+  const g = ty => p.find(x=>x.type===ty).value;
+  const day = `${g('year')}-${g('month')}-${g('day')}`, wd = g('weekday'), min = (+g('hour')%24)*60 + +g('minute');
+  const base = { min, day, closeMin:960 };
+  if(wd==='Sat'||wd==='Sun') return { ...base, key:'closed', label:t('sessWeekend'), color:'#7a8599' };
+  if(US_HOLIDAYS[day])        return { ...base, key:'closed', label:t('sessHoliday'), color:'#7a8599' };
+  const early = !!US_EARLY_CLOSE[day], closeMin = early ? 780 : 960, afterEnd = early ? 1020 : 1200, tag = early ? t('earlyTag') : '';
+  const o = { ...base, closeMin };
+  if(min>=240 && min<570)        return { ...o, key:'pre',     label:t('sessPre'),     color:'#f5a524' };
+  if(min>=570 && min<585)        return { ...o, key:'open',    label:t('sessOpen')+tag, color:'#ff8a3d' };
+  if(min>=585 && min<closeMin)   return { ...o, key:'regular', label:t('sessRegular')+tag, color:'#26d98b' };
+  if(min>=closeMin && min<afterEnd) return { ...o, key:'after', label:t('sessAfter'),   color:'#f5a524' };
+  return { ...o, key:'closed', label:t('sessClosed'), color:'#7a8599' };
 }
+const etSession = () => sessionInfo(new Date());
 const isOffHours = ses => ['pre','after','open'].includes(ses.key);
+
+/* 预计「此时已完成的全天成交量比例」。date 应取数据抓取的时间，而不是现在。 */
+function volFraction(date){
+  const s = sessionInfo(date);
+  if(s.key==='pre') return { frac:VOL_FLOOR, floor:true };
+  if(s.key==='open' || s.key==='regular'){
+    const off = Math.max(0, Math.min(390, (s.min-570)*390/(s.closeMin-570)));   // 提前收市日按比例拉伸
+    let f = 1;
+    for(let i=1;i<VOL_CURVE.length;i++){
+      const [x0,y0]=VOL_CURVE[i-1], [x1,y1]=VOL_CURVE[i];
+      if(off<=x1){ f = y0+(y1-y0)*(off-x0)/(x1-x0); break; }
+    }
+    return { frac:Math.max(VOL_FLOOR,f), floor:f<VOL_FLOOR };
+  }
+  return { frac:1, floor:false };      // 盘后 / 休市：成交量已是（接近）全天数据
+}
+/* 计算每只股票的 RVOL（原始 & 折算），折算按数据抓取时刻；模拟数据不折算 */
+function applyRvol(){
+  state.rvolOn = $('rvolAdj').checked;
+  const vf = state.live && state.rvolOn ? volFraction(state.scanTs ? new Date(state.scanTs) : new Date()) : { frac:1, floor:false };
+  state.rvolFrac = vf.frac; state.rvolFloor = vf.floor;
+  state.raw.forEach(r => {
+    if(r.volume>0 && r.avgVolume>0){
+      r.rvolRaw = +(r.volume/r.avgVolume).toFixed(2);
+      r.rvol = (r.mock || !state.live) ? r.rvolRaw : +(r.rvolRaw/vf.frac).toFixed(2);
+    } else { r.rvolRaw = null; r.rvol = null; }
+  });
+}
 
 function liquidityEstimate(s, ses){
   // 经验性启发式：低价股、低成交量、非常规时段 → 点差更大。并非真实报价点差。
@@ -536,6 +618,7 @@ function scoreStock(s, ses){
   const liq = liquidityEstimate(s, ses);
   let grade = score>=70 ? 'strong' : score>=50 ? 'watch' : 'skip';
   if(liq.lvl==='bad') grade = 'skip';
+  else if(r==null && grade==='strong') grade = 'watch';      // 没有量能数据，不能给最高评级
 
   const reasons = [];
   if(c>20) reasons.push({tone:'bad',  txt:t('rsnMomHot',{v:fmt(c,1)})});
@@ -558,19 +641,23 @@ function scoreStock(s, ses){
 /* 风险参数（本金/单笔风险/止损幅度/盈亏比），保存在本机 */
 function loadRiskInputs(){
   const d = lsGet(LS.risk, null); if(!d) return;
-  if(d.cap!=null) $('pCap').value = d.cap; if(d.risk!=null) $('pRisk').value = d.risk;
-  if(d.stop!=null) $('pStop').value = d.stop; if(d.rr!=null) $('pRR').value = d.rr;
+  [['cap','pCap'],['risk','pRisk'],['stop','pStop'],['rr','pRR'],['pull','pPull'],['cost','pCost']].forEach(([k,id]) => { if(d[k]!=null) $(id).value = d[k]; });
 }
-function saveRiskInputs(){ lsSet(LS.risk, { cap:$('pCap').value, risk:$('pRisk').value, stop:$('pStop').value, rr:$('pRR').value }); }
+function saveRiskInputs(){ lsSet(LS.risk, { cap:$('pCap').value, risk:$('pRisk').value, stop:$('pStop').value, rr:$('pRR').value, pull:$('pPull').value, cost:$('pCost').value }); }
 
+/* 交易计划：
+ *  有效风险% = 止损% + 往返点差%；仓位 = 可承受亏损 ÷ 有效风险%（不加杠杆，封顶本金）；
+ *  目标涨幅% = 有效风险% × 盈亏比 + 点差%，使「扣除点差后」的净盈亏比等于你设定的 R:R。 */
 function tradePlan(s){
   const cap=+$('pCap').value, risk=+$('pRisk').value, stop=+$('pStop').value, rr=+$('pRR').value;
-  if(!(cap>0 && risk>0 && stop>0 && rr>0)) return { valid:false };
-  const entry = s.price*(1-ENTRY_PULLBACK);
-  const stopPx = entry*(1-stop/100), target = entry*(1+stop*rr/100);
-  let pos = (cap*risk/100)/(stop/100), capped = false;
+  const pull=+$('pPull').value, cost=+$('pCost').value;
+  if(!(cap>0 && risk>0 && stop>0 && rr>0) || !(pull>=0) || !(cost>=0)) return { valid:false };
+  const eff = stop + cost;
+  const entry = s.price*(1-pull/100);
+  const stopPx = entry*(1-stop/100), target = entry*(1+(eff*rr+cost)/100);
+  let pos = (cap*risk/100)/(eff/100), capped = false;
   if(pos>cap){ pos = cap; capped = true; }
-  return { valid:true, entry, stopPx, target, pos, capped, units:pos/entry, riskUsd:pos*stop/100, gainUsd:pos*stop*rr/100 };
+  return { valid:true, entry, stopPx, target, pos, capped, units:pos/entry, riskUsd:pos*eff/100, gainUsd:pos*eff*rr/100 };
 }
 const usd = n => '$'+Number(n).toFixed(2);
 
@@ -679,7 +766,7 @@ async function copySym(sym){
 /* =====================================================================
  *  模式切换 / Key 设置 / 语言切换 / 初始化
  * ===================================================================== */
-function renderAll(){ renderScan(); renderPicks(); renderSelected(); }
+function renderAll(){ applyRvol(); renderScan(); renderPicks(); renderSelected(); }
 
 function renderMode(){
   $('modeSwitch').classList.toggle('live', state.live);
@@ -722,13 +809,15 @@ $('modeSwitch').onclick = () => setMode(!state.live);
 $('btnRefresh').onclick = refreshScan;
 $('btnCopy').onclick = () => copySym(state.selected?.symbol);
 ['fChg','fRvol','fMin','fMax'].forEach(id => $(id).addEventListener('input', () => { renderScan(); renderPicks(); }));
-['pCap','pRisk','pStop','pRR'].forEach(id => $(id).addEventListener('input', () => { saveRiskInputs(); renderPicks(); renderSelected(); }));
+$('rvolAdj').onchange = () => { lsSet(LS.rvolAdj, $('rvolAdj').checked); renderAll(); };
+['pCap','pRisk','pStop','pRR','pPull','pCost'].forEach(id => $(id).addEventListener('input', () => { saveRiskInputs(); renderPicks(); renderSelected(); }));
 $('btnKey').onclick = () => { $('keyBar').classList.toggle('hidden'); $('keyInput').value = lsGet(LS.key) || ''; };
 $('keySave').onclick = () => { lsSet(LS.key, $('keyInput').value.trim()); toast(t('keySaved')); $('keyBar').classList.add('hidden'); };
 $('keyClear').onclick = () => { localStorage.removeItem(LS.key); $('keyInput').value=''; toast(t('keyCleared')); };
 
 /* 初始化：不自动请求任何数据 */
 loadRiskInputs();
+$('rvolAdj').checked = lsGet(LS.rvolAdj, true) !== false;
 if(state.live && !getKey()) state.live = false;
 applyLang();
 setMode(state.live);
