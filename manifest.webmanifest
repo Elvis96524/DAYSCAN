@@ -1,7 +1,7 @@
 {
-  "name": "Scanner 美股日内交易扫描器",
+  "name": "Scanner",
   "short_name": "Scanner",
-  "description": "US day-trading scanner with FMP data and eToro risk hints",
+  "description": "Scanner with FMP data and eToro risk hints",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
