@@ -1,0 +1,11 @@
+{
+  "v": 1,
+  "iter": 150000,
+  "users": [
+    {
+      "name": "elvis",
+      "salt": "ZPmA4XqiQgIYxPcz2Kz0mw==",
+      "hash": "6dcmTgGFiUjL/PkmxNQroGwsALgLfwRFtusj7WeEYUs="
+    }
+  ]
+}
