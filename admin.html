@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Scanner 账号管理</title>
+<style>
+  :root{--ink:#0c0a1f;--line:rgba(160,150,255,.2);--text:#ecebff;--muted:#a09dc8;--violet:#8b5cf6;--sky:#38bdf8;--mint:#34e0a1;--coral:#ff6b7a;--amber:#ffb547}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:radial-gradient(50rem 30rem at 0 -10%,rgba(139,92,246,.35),transparent 60%),var(--ink);color:var(--text);
+    font:14px/1.55 system-ui,-apple-system,"Segoe UI","PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif;padding:20px 14px 60px}
+  main{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+  h1{margin:0;font-size:22px} h2{margin:0 0 10px;font-size:16px}
+  .card{padding:18px;border-radius:18px;border:1px solid var(--line);background:rgba(28,24,64,.85)}
+  p{margin:0 0 8px;color:var(--muted);font-size:13px} .warn{color:var(--amber)}
+  label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);margin-bottom:10px}
+  input[type=text],input[type=password]{height:40px;padding:0 12px;font:inherit;font-size:14px;color:var(--text);background:rgba(8,6,24,.6);border:1px solid var(--line);border-radius:10px;width:100%}
+  input:focus{outline:2px solid var(--sky);outline-offset:1px}
+  .btn{font:inherit;font-weight:600;font-size:13px;color:var(--text);cursor:pointer;padding:9px 15px;border-radius:999px;background:rgba(160,150,255,.14);border:1px solid var(--line)}
+  .btn:hover{background:rgba(160,150,255,.24)}
+  .primary{color:#fff;border-color:transparent;background:linear-gradient(135deg,var(--violet),var(--sky))}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .urow{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}
+  .urow b{flex:1;word-break:break-all}
+  .msg{min-height:20px;font-size:13px;margin-top:8px} .ok{color:var(--mint)} .bad{color:var(--coral)}
+  code{background:rgba(160,150,255,.14);padding:1px 6px;border-radius:6px}
+  ol{margin:6px 0 0;padding-left:20px;color:var(--muted);font-size:13px} li{margin-bottom:4px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Scanner 账号管理</h1>
+  <p>只有你能让账号生效：这里生成 <code>users.json</code>，只有你把它上传到自己的 GitHub 仓库，别人才能用这些账号登录。别人打开这个页面也无法替你发布。</p>
+
+  <section class="card">
+    <h2>1. 载入现有账号（可选）</h2>
+    <div class="row">
+      <button class="btn" id="loadSite" type="button">读取网站上现有的 users.json</button>
+      <label class="btn" style="margin:0;display:inline-flex;flex-direction:row">选择文件<input id="loadFile" type="file" accept=".json,application/json" hidden></label>
+    </div>
+    <div id="loadMsg" class="msg"></div>
+  </section>
+
+  <section class="card">
+    <h2>2. 添加账号 / 重设密码</h2>
+    <label>用户名（2–20 位：字母、数字、下划线、点、短横线）<input id="nm" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="20"></label>
+    <label>密码（至少 10 位，越长越好）<input id="pw" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+    <div class="row">
+      <button class="btn" id="gen" type="button">生成随机密码</button>
+      <button class="btn primary" id="add" type="button">添加 / 更新</button>
+    </div>
+    <p class="warn" style="margin-top:10px">密码会显示在屏幕上，请在添加后马上告诉对方；页面不会保存明文。用户名已存在时，会替换成新密码。</p>
+    <div id="addMsg" class="msg"></div>
+  </section>
+
+  <section class="card">
+    <h2>3. 当前账号 <span id="cnt" class="muted"></span></h2>
+    <div id="list"></div>
+  </section>
+
+  <section class="card">
+    <h2>4. 下载并上传到 GitHub</h2>
+    <button class="btn primary" id="dl" type="button">下载 users.json</button>
+    <ol>
+      <li>打开你的 GitHub 仓库 → Add file → Upload files。</li>
+      <li>把下载的 <code>users.json</code> 拖进去（文件名必须是 users.json，会替换旧的）→ Commit changes。</li>
+      <li>等 1–2 分钟，用户重新打开应用就能用新账号；被删除的用户或改了密码的用户，回到页面时会被退出。</li>
+    </ol>
+    <p class="warn" style="margin-top:10px">仓库是公开的，users.json 里的用户名和加密后的密码任何人都能看到。加密能挡住随手猜，但挡不住对弱密码的离线破解，所以请用长密码（随机生成的最好）。</p>
+  </section>
+</main>
+
+<script>
+const ITER = 150000;
+let users = [];
+const $ = id => document.getElementById(id);
+const enc = new TextEncoder();
+const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64 = x => Uint8Array.from(atob(x), c => c.charCodeAt(0));
+const NAME_RE = /^[A-Za-z0-9_.\-]{2,20}$/;
+const esc = x => String(x).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function pbkdf(pw, salt){
+  const k = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveBits']);
+  return b64(await crypto.subtle.deriveBits({ name:'PBKDF2', hash:'SHA-256', salt:unb64(salt), iterations:ITER }, k, 256));
+}
+function say(id, text, cls){ const e = $(id); e.textContent = text; e.className = 'msg ' + (cls || ''); }
+function render(){
+  $('cnt').textContent = users.length ? `(${users.length})` : '';
+  $('list').innerHTML = users.length ? users.map(u => `<div class="urow"><b>${esc(u.name)}</b><button class="btn" data-del="${esc(u.name)}" type="button">删除</button></div>`).join('') : '<p>还没有账号。</p>';
+  $('list').querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+    if(!confirm('删除 ' + b.dataset.del + '？')) return;
+    users = users.filter(u => u.name !== b.dataset.del); render();
+  });
+}
+function take(j){
+  const list = (Array.isArray(j.users) ? j.users : []).filter(u => u && u.name && u.salt && u.hash);
+  if(j.iter && Number(j.iter) !== ITER) throw new Error('iter 不一致');
+  users = list; render();
+}
+$('loadSite').onclick = async () => {
+  try{ const r = await fetch('users.json', { cache:'no-store' }); if(!r.ok) throw new Error('HTTP ' + r.status); take(await r.json()); say('loadMsg', `已读取 ${users.length} 个账号`, 'ok'); }
+  catch(e){ say('loadMsg', '读取失败：' + e.message + '（如果是在电脑上直接打开本文件，请改用「选择文件」）', 'bad'); }
+};
+$('loadFile').onchange = async e => {
+  const f = e.target.files[0]; if(!f) return;
+  try{ take(JSON.parse(await f.text())); say('loadMsg', `已载入 ${users.length} 个账号`, 'ok'); }catch(err){ say('loadMsg', '文件不对：' + err.message, 'bad'); }
+};
+$('gen').onclick = () => {
+  const al = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const r = crypto.getRandomValues(new Uint32Array(14));
+  $('pw').value = Array.from(r, n => al[n % al.length]).join('');
+};
+$('add').onclick = async () => {
+  const name = $('nm').value.trim(), pw = $('pw').value;
+  if(!NAME_RE.test(name)) return say('addMsg', '用户名需 2–20 位，只能用字母、数字、下划线、点和短横线', 'bad');
+  if(pw.length < 10) return say('addMsg', '密码至少 10 位', 'bad');
+  const salt = b64(crypto.getRandomValues(new Uint8Array(16)));
+  const rec = { name, salt, hash: await pbkdf(pw, salt) };
+  const i = users.findIndex(u => u.name.toLowerCase() === name.toLowerCase());
+  if(i >= 0) users[i] = rec; else users.push(rec);
+  render(); say('addMsg', `已${i >= 0 ? '更新' : '添加'} ${name}，密码：${pw}（请现在告诉对方）`, 'ok');
+  $('nm').value = ''; $('pw').value = '';
+};
+$('dl').onclick = () => {
+  if(!users.length && !confirm('现在没有任何账号，上传后所有人都无法登录。确定下载？')) return;
+  const blob = new Blob([JSON.stringify({ v:1, iter:ITER, users }, null, 2) + '\n'], { type:'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'users.json'; document.body.appendChild(a); a.click(); a.remove();
+};
+render();
+</script>
+</body>
+</html>

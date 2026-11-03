@@ -275,7 +275,6 @@
       <option value="en">🌐 English</option>
     </select>
     <button class="btn btn-primary js-install" type="button" data-i18n="installBtn"></button>
-    <button id="btnUsers" class="btn hidden" type="button" data-i18n="userBtn"></button>
     <button id="btnLogout" class="btn hidden" type="button"></button>
     <button id="btnKey" class="btn" type="button">🔑 API Key</button>
     <div id="modeSwitch" class="seg2" role="switch" tabindex="0" aria-checked="false" data-i18n-aria="modeAria">
@@ -418,28 +417,12 @@
     <p id="authSub"></p>
     <label class="field"><span data-i18n="authUser"></span><input id="authUser" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="20"></label>
     <label class="field"><span data-i18n="authPass"></span><input id="authPass" type="password" autocomplete="current-password"></label>
-    <label class="field" id="authPass2Wrap"><span data-i18n="authPass2"></span><input id="authPass2" type="password" autocomplete="new-password"></label>
     <label class="check"><input id="authRemember" type="checkbox" checked><span data-i18n="authRemember"></span></label>
     <div id="authErr" class="auth-err" role="alert"></div>
     <button id="authGo" class="btn btn-primary" type="submit"></button>
     <div class="install-row"><button class="btn js-install" type="button" data-i18n="installBtn"></button></div>
     <p class="auth-note" data-i18n="authLocalNote"></p>
   </form>
-</div>
-
-<!-- 用户管理（仅管理员） -->
-<div id="userOv" class="auth hidden">
-  <div class="auth-card wide">
-    <div class="auth-top"><h2 style="flex:1" data-i18n="userTitle"></h2><button id="userClose" class="btn btn-sm" type="button" data-i18n="userClose"></button></div>
-    <div id="userList"></div>
-    <div class="add-user">
-      <label class="field"><span data-i18n="userNewName"></span><input id="userNewName" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="20"></label>
-      <label class="field"><span data-i18n="userNewPass"></span><input id="userNewPass" type="password" autocomplete="new-password"></label>
-      <button id="userAddBtn" class="btn btn-primary" type="button" data-i18n="userAddBtn"></button>
-    </div>
-    <div id="userErr" class="auth-err" role="alert"></div>
-    <p class="auth-note" data-i18n="userNote"></p>
-  </div>
 </div>
 
 <div id="toast" role="status" aria-live="polite"></div>
@@ -494,19 +477,13 @@ const I18N = {
     installBtn:'⬇ 安装到手机', installed:'已安装',
     installIos:'iPhone 请用 Safari 打开本页：点底部的分享按钮 → 添加到主屏幕。（Chrome、微信等内置浏览器无法安装）',
     installAndroid:'请用 Chrome 打开本页：点右上角 ⋮ → 安装应用 / 添加到主屏幕。（微信等内置浏览器无法安装，请先用 Chrome 打开）',
-    authSetupTitle:'设置管理员', authSetupSub:'第一次使用：请创建管理员账号。只有管理员能添加其他用户。',
-    authLoginTitle:'登录', authLoginSub:'请输入用户名和密码。',
-    authUser:'用户名', authPass:'密码', authPass2:'再次输入密码', authRemember:'在这台设备上保持登录',
-    authCreate:'创建管理员并进入', authLogin:'登录',
-    authErrFill:'请填写用户名和密码', authErrName:'用户名需 2–20 位，只能用字母、数字、下划线、点和短横线', authErrShort:'密码至少 8 位',
-    authErrMatch:'两次输入的密码不一致', authErrBad:'用户名或密码不对', authErrWait:'错误次数太多，请 {s} 秒后再试',
-    authLocalNote:'账号只保存在这台设备的浏览器里，换手机需重新设置。这只是本机的使用门槛，不是服务器级别的安全保护，忘记管理员密码只能清除网站数据后重新设置。',
-    userBtn:'👤 用户', logoutBtn:'退出 {n}', userTitle:'用户管理', userClose:'关闭',
-    userRoleAdmin:'管理员', userRoleUser:'用户', userReset:'重设密码', userDelete:'删除',
-    userNewName:'新用户名', userNewPass:'初始密码（至少 8 位）', userAddBtn:'添加用户',
-    userResetPrompt:'给 {n} 设置新密码（至少 8 位）：', userDeleteConfirm:'确定删除用户 {n}？',
-    userAdded:'已添加用户 {n}', userExists:'这个用户名已存在', userDeleted:'已删除 {n}', userPwChanged:'已更新 {n} 的密码',
-    userNote:'用户只存在这台设备上。要让别人在他自己的手机上使用，需在他的手机上用你的管理员账号登录后添加。',
+    authLoginTitle:'登录', authLoginSub:'请输入管理员给你的用户名和密码。',
+    authLoading:'正在读取账号列表…', authErrLoad:'无法读取账号列表，请检查网络后点「重试」。',
+    authNoUsers:'还没有可用的账号。请联系管理员获取用户名和密码。', authRetry:'重试',
+    authUser:'用户名', authPass:'密码', authRemember:'在这台设备上保持登录', authLogin:'登录',
+    authErrFill:'请填写用户名和密码', authErrBad:'用户名或密码不对', authErrWait:'错误次数太多，请 {s} 秒后再试',
+    authLocalNote:'账号由管理员统一发放，请向管理员索取用户名和密码。这是使用门槛，不是服务器级别的安全保护。',
+    logoutBtn:'退出 {n}',
     scanFoot:'点击股票 → 真实模式下会按需获取该股数据（1 次请求，有缓存），评分与计划在本机计算',
     enrichBtn:'补全 Top 8 的 RVOL', enrichHint:'RVOL 需要单独获取成交量：点上方「补全」（约 8 次请求），或点击个股（1 次）。补全前评级最高为「可关注」。',
     quoteLoading:'正在获取报价与平均成交量…', quoteFail:'获取报价失败：{msg}',
@@ -591,19 +568,13 @@ const I18N = {
     installBtn:'⬇ Install app', installed:'Installed',
     installIos:'On iPhone open this page in Safari: tap the Share button → Add to Home Screen. (Chrome and in-app browsers like WeChat cannot install it.)',
     installAndroid:'Open this page in Chrome: tap ⋮ at the top right → Install app / Add to Home screen. (In-app browsers like WeChat cannot install it — open it in Chrome first.)',
-    authSetupTitle:'Set up administrator', authSetupSub:'First time here: create the administrator account. Only the administrator can add other users.',
-    authLoginTitle:'Sign in', authLoginSub:'Enter your username and password.',
-    authUser:'Username', authPass:'Password', authPass2:'Repeat password', authRemember:'Keep me signed in on this device',
-    authCreate:'Create administrator', authLogin:'Sign in',
-    authErrFill:'Enter a username and password', authErrName:'Username must be 2–20 characters: letters, numbers, _ . -', authErrShort:'Password must be at least 8 characters',
-    authErrMatch:'The two passwords do not match', authErrBad:'Wrong username or password', authErrWait:'Too many attempts — try again in {s} s',
-    authLocalNote:'Accounts are stored only in this device\'s browser, so a new phone must be set up again. This is a gate on this device, not server-grade security. If you forget the administrator password, clear the site data and set up again.',
-    userBtn:'👤 Users', logoutBtn:'Sign out {n}', userTitle:'Manage users', userClose:'Close',
-    userRoleAdmin:'Admin', userRoleUser:'User', userReset:'Reset password', userDelete:'Delete',
-    userNewName:'New username', userNewPass:'Initial password (8+ characters)', userAddBtn:'Add user',
-    userResetPrompt:'New password for {n} (8+ characters):', userDeleteConfirm:'Delete user {n}?',
-    userAdded:'Added user {n}', userExists:'That username already exists', userDeleted:'Deleted {n}', userPwChanged:'Password updated for {n}',
-    userNote:'Users exist only on this device. To let someone use it on their own phone, sign in there with your administrator account and add them.',
+    authLoginTitle:'Sign in', authLoginSub:'Enter the username and password the administrator gave you.',
+    authLoading:'Loading accounts…', authErrLoad:'Could not load the account list. Check your connection and tap Retry.',
+    authNoUsers:'No accounts are available yet. Ask the administrator for a username and password.', authRetry:'Retry',
+    authUser:'Username', authPass:'Password', authRemember:'Keep me signed in on this device', authLogin:'Sign in',
+    authErrFill:'Enter a username and password', authErrBad:'Wrong username or password', authErrWait:'Too many attempts — try again in {s} s',
+    authLocalNote:'Accounts are issued by the administrator — ask them for a username and password. This is an access gate, not server-grade security.',
+    logoutBtn:'Sign out {n}',
     scanFoot:'Click a stock → in live mode its data is fetched on demand (1 request, cached); scoring and plan run locally',
     enrichBtn:'Fill RVOL for Top 8', enrichHint:'RVOL needs volume data fetched separately: click "Fill" above (about 8 requests) or click a stock (1). Until then the grade is capped at "Watch".',
     quoteLoading:'Fetching quote and average volume…', quoteFail:'Quote failed: {msg}',
@@ -1265,7 +1236,7 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) autoO
 /* =====================================================================
  *  安装按钮 + 登录 / 用户管理（仅本机；PBKDF2 加盐哈希存密码，不存明文）
  * ===================================================================== */
-let locked = true, deferredInstall = null, authFails = 0, authUntil = 0;
+let locked = true, deferredInstall = null, authFails = 0, authUntil = 0, accounts = [], accIter = 150000, authMode = 'loading', me = null;
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
 function renderInstall(){ document.querySelectorAll('.js-install').forEach(b => b.classList.toggle('hidden', isStandalone())); }
@@ -1277,47 +1248,58 @@ document.querySelectorAll('.js-install').forEach(b => b.onclick = async () => {
 });
 renderInstall();
 
+/* 账号清单来自网站上的 users.json（只有仓库所有者能发布）；App 里没有创建 / 管理账号的入口。 */
 const enc = new TextEncoder();
 const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
 const unb64 = x => Uint8Array.from(atob(x), c => c.charCodeAt(0));
-const newSalt = () => b64(crypto.getRandomValues(new Uint8Array(16)));
-async function pbkdf(pw, salt){
+async function pbkdf(pw, salt, iter){
   const k = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveBits']);
-  return b64(await crypto.subtle.deriveBits({ name:'PBKDF2', hash:'SHA-256', salt:unb64(salt), iterations:150000 }, k, 256));
+  return b64(await crypto.subtle.deriveBits({ name:'PBKDF2', hash:'SHA-256', salt:unb64(salt), iterations:iter }, k, 256));
 }
-const USERS_KEY = 'dt_users', SESS_KEY = 'dt_sess';
-const users = () => { const u = lsGet(USERS_KEY, []); return Array.isArray(u) ? u : []; };
-const saveUsers = u => lsSet(USERS_KEY, u);
-const findUser = n => users().find(u => u.name.toLowerCase() === String(n).trim().toLowerCase());
-const NAME_RE = /^[A-Za-z0-9_.\-]{2,20}$/;
+const SESS_KEY = 'dt_sess';
+const findUser = n => accounts.find(u => u.name.toLowerCase() === String(n).trim().toLowerCase());
 function readSess(){ try{ return JSON.parse(localStorage.getItem(SESS_KEY) || sessionStorage.getItem(SESS_KEY) || 'null'); }catch{ return null; } }
-function startSess(name, remember){
-  const v = JSON.stringify({ name });
-  try{ localStorage.removeItem(SESS_KEY); sessionStorage.removeItem(SESS_KEY); (remember ? localStorage : sessionStorage).setItem(SESS_KEY, v); }catch{}
+function startSess(u, remember){
+  try{ localStorage.removeItem(SESS_KEY); sessionStorage.removeItem(SESS_KEY); (remember ? localStorage : sessionStorage).setItem(SESS_KEY, JSON.stringify({ name:u.name, h:u.hash })); }catch{}
 }
 function endSess(){ try{ localStorage.removeItem(SESS_KEY); sessionStorage.removeItem(SESS_KEY); }catch{} }
-let me = null;
-
-function showAuth(){
-  const setup = users().length === 0;
-  $('authTitle').textContent = setup ? t('authSetupTitle') : t('authLoginTitle');
-  $('authSub').textContent = setup ? t('authSetupSub') : t('authLoginSub');
-  $('authGo').textContent = setup ? t('authCreate') : t('authLogin');
-  $('authPass2Wrap').classList.toggle('hidden', !setup);
-  $('authPass').autocomplete = setup ? 'new-password' : 'current-password';
-  $('authErr').textContent = ''; $('authPass').value = ''; $('authPass2').value = '';
-  $('authOv').classList.remove('hidden'); document.body.classList.add('locked'); locked = true;
+async function loadAccounts(){
+  try{
+    const r = await fetch('users.json', { cache:'no-store' }); if(!r.ok) throw new Error('HTTP '+r.status);
+    const j = await r.json();
+    accounts = (Array.isArray(j.users) ? j.users : []).filter(u => u && u.name && u.salt && u.hash);
+    accIter = Number(j.iter) || 150000; return true;
+  }catch{ return false; }
+}
+function showAuth(mode){
+  authMode = mode; locked = true;
+  const ready = mode === 'login';
+  $('authTitle').textContent = t('authLoginTitle');
+  $('authSub').textContent = mode==='loading' ? t('authLoading') : mode==='error' ? t('authErrLoad') : mode==='empty' ? t('authNoUsers') : t('authLoginSub');
+  $('authGo').textContent = ready ? t('authLogin') : t('authRetry');
+  $('authGo').disabled = mode === 'loading';
+  ['authUser','authPass','authRemember'].forEach(id => { $(id).disabled = !ready; });
+  $('authErr').textContent = ''; $('authPass').value = '';
+  $('authOv').classList.remove('hidden'); document.body.classList.add('locked');
 }
 function unlock(u){
   me = u; locked = false;
   document.body.classList.remove('locked'); $('authOv').classList.add('hidden');
-  $('btnUsers').classList.toggle('hidden', !u.admin);
   $('btnLogout').classList.remove('hidden'); $('btnLogout').textContent = t('logoutBtn',{n:u.name});
-  $('authPass').value = ''; $('authPass2').value = '';
+  $('authPass').value = '';
   renderSession(); autoOpenCheck();
+}
+function logout(){ endSess(); me = null; $('btnLogout').classList.add('hidden'); $('authUser').value = ''; showAuth('login'); }
+async function boot(){
+  showAuth('loading');
+  if(!(await loadAccounts())) return showAuth('error');
+  if(!accounts.length) return showAuth('empty');
+  const sess = readSess(), u = sess && findUser(sess.name);
+  if(u && sess.h === u.hash) unlock(u); else { endSess(); showAuth('login'); }
 }
 $('authForm').onsubmit = async e => {
   e.preventDefault();
+  if(authMode !== 'login'){ await boot(); return; }
   const err = m => { $('authErr').textContent = m; };
   const name = $('authUser').value.trim(), pw = $('authPass').value, remember = $('authRemember').checked;
   if(!name || !pw) return err(t('authErrFill'));
@@ -1325,61 +1307,22 @@ $('authForm').onsubmit = async e => {
   if(wait > 0) return err(t('authErrWait',{s:wait}));
   $('authGo').disabled = true;
   try{
-    if(users().length === 0){                                           // 首次：创建管理员
-      if(!NAME_RE.test(name)) return err(t('authErrName'));
-      if(pw.length < 8) return err(t('authErrShort'));
-      if(pw !== $('authPass2').value) return err(t('authErrMatch'));
-      const salt = newSalt(), u = { name, salt, hash: await pbkdf(pw, salt), admin:true };
-      saveUsers([u]); startSess(u.name, remember); unlock(u);
-    } else {
-      const u = findUser(name);
-      const ok = u && (await pbkdf(pw, u.salt)) === u.hash;
-      if(!ok){ if(++authFails >= 5){ authUntil = Date.now() + 30000; authFails = 0; } return err(t('authErrBad')); }
-      authFails = 0; startSess(u.name, remember); unlock(u);
-    }
+    const u = findUser(name);
+    const ok = u && (await pbkdf(pw, u.salt, accIter)) === u.hash;
+    if(!ok){ if(++authFails >= 5){ authUntil = Date.now() + 30000; authFails = 0; } return err(t('authErrBad')); }
+    authFails = 0; startSess(u, remember); unlock(u);
   } finally { $('authGo').disabled = false; }
 };
-$('btnLogout').onclick = () => { endSess(); me = null; $('btnUsers').classList.add('hidden'); $('btnLogout').classList.add('hidden'); $('authUser').value = ''; showAuth(); };
-
-/* 用户管理：只有管理员能打开；每个操作再次校验 me.admin */
-function renderUsers(){
-  $('userList').innerHTML = users().map(u => `
-    <div class="urow"><b>${esc(u.name)}</b>
-      <span class="pill ${u.admin?'pill-warn':'pill-mute'}">${u.admin?t('userRoleAdmin'):t('userRoleUser')}</span><span class="grow"></span>
-      <button type="button" class="btn btn-sm" data-reset="${esc(u.name)}">${t('userReset')}</button>
-      ${u.admin ? '' : `<button type="button" class="btn btn-sm" data-del="${esc(u.name)}">${t('userDelete')}</button>`}
-    </div>`).join('');
-  $('userList').querySelectorAll('[data-reset]').forEach(b => b.onclick = async () => {
-    if(!me?.admin) return;
-    const name = b.dataset.reset, pw = prompt(t('userResetPrompt',{n:name}));
-    if(pw == null) return;
-    if(pw.length < 8) return toast(t('authErrShort'));
-    const list = users(), u = list.find(x => x.name === name); if(!u) return;
-    u.salt = newSalt(); u.hash = await pbkdf(pw, u.salt); saveUsers(list); toast(t('userPwChanged',{n:name}));
-  });
-  $('userList').querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
-    if(!me?.admin) return;
-    const name = b.dataset.del; if(!confirm(t('userDeleteConfirm',{n:name}))) return;
-    saveUsers(users().filter(x => x.name !== name || x.admin)); renderUsers(); toast(t('userDeleted',{n:name}));
-  });
-}
-$('btnUsers').onclick = () => { if(!me?.admin) return; $('userErr').textContent = ''; renderUsers(); $('userOv').classList.remove('hidden'); };
-$('userClose').onclick = () => $('userOv').classList.add('hidden');
-$('userAddBtn').onclick = async () => {
-  const err = m => { $('userErr').textContent = m; };
-  if(!me?.admin) return;
-  const name = $('userNewName').value.trim(), pw = $('userNewPass').value;
-  if(!NAME_RE.test(name)) return err(t('authErrName'));
-  if(pw.length < 8) return err(t('authErrShort'));
-  if(findUser(name)) return err(t('userExists'));
-  const salt = newSalt(); saveUsers([...users(), { name, salt, hash: await pbkdf(pw, salt), admin:false }]);
-  $('userNewName').value = ''; $('userNewPass').value = ''; err(''); renderUsers(); toast(t('userAdded',{n:name}));
-};
-
-(function authInit(){
-  const sess = readSess(), u = sess && findUser(sess.name);
-  if(u) unlock(u); else { endSess(); showAuth(); }
-})();
+$('btnLogout').onclick = logout;
+/* 回到页面时重新核对账号：被管理员删除或改了密码的用户会被退出（只读一个静态文件，不消耗 FMP 额度） */
+document.addEventListener('visibilitychange', async () => {
+  if(document.hidden || locked || !me) return;
+  if(!(await loadAccounts())) return;
+  const u = findUser(me.name);
+  if(!u || u.hash !== me.hash) logout();
+});
+try{ localStorage.removeItem('dt_users'); }catch{}
+boot();
 
 /* PWA：注册 Service Worker（仅 https / localhost 生效） */
 if('serviceWorker' in navigator){ window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{})); }
