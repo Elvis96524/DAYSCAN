@@ -83,7 +83,7 @@
   .keybar .in{display:flex;flex-wrap:wrap;align-items:center;gap:10px;max-width:880px}
   .keybar input{flex:1;min-width:220px;width:auto}
 
-  .wrap{max-width:1280px;margin:0 auto;padding:16px 16px 48px;display:flex;flex-direction:column;gap:16px}
+  .wrap{max-width:760px;margin:0 auto;padding:16px 16px 48px;display:flex;flex-direction:column;gap:16px}
   .layout{display:grid;grid-template-columns:minmax(340px,410px) 1fr;gap:16px;align-items:start}
   .stack{display:flex;flex-direction:column;gap:16px;min-width:0}
   .card{background:linear-gradient(180deg,rgba(30,26,68,.82),rgba(20,17,44,.82));border:1px solid var(--line);border-radius:var(--r);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
@@ -213,6 +213,28 @@
   .kv .c-entry{color:#7fd6fb} .kv .c-stop{color:#ff98a2} .kv .c-target{color:#6fe9bd} .kv .c-size{color:#c3adff}
   .tips{margin:16px 0 0;padding-left:18px;color:var(--muted);font-size:12px;line-height:1.6}
 
+  .tabs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .tab{font:inherit;font-weight:750;font-size:15px;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;
+    padding:16px 12px;border-radius:16px;background:rgba(160,150,255,.1);border:1px solid var(--line);transition:background .15s,transform .1s}
+  .tab:hover{background:rgba(160,150,255,.18)}
+  .tab:active{transform:scale(.98)}
+  .tab[aria-pressed=true]{color:#fff;border-color:transparent;background:linear-gradient(135deg,var(--violet),#5b8def 60%,var(--sky));box-shadow:0 10px 28px -12px rgba(139,92,246,.9)}
+  .tab[aria-pressed=true] .count{background:rgba(255,255,255,.25);color:#fff}
+  .panel{padding:16px}
+  .panel-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .panel-head .meta{margin-left:auto}
+  .opts{margin-bottom:12px}
+  .opts summary{display:inline-block;cursor:pointer;list-style:none;font-size:12.5px;color:var(--muted);padding:6px 13px;border-radius:999px;border:1px solid var(--line)}
+  .opts summary::-webkit-details-marker{display:none}
+  .opts[open] summary{color:var(--text);background:rgba(160,150,255,.12)}
+  .opts>*:not(summary){margin-top:12px}
+  .panel .scan-list{min-height:0;max-height:60vh;padding:0}
+  .risk{scroll-margin-top:84px}
+  .risk .plan{margin-top:16px}
+  .risk-foot{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;margin-top:14px}
+  .risk-foot .liq{display:flex;align-items:center;gap:10px;min-width:0}
+  .risk-foot .meter{width:90px;margin:0}
+  .pill-limit{color:var(--amber);background:rgba(255,181,71,.15)}
   body.locked .topbar, body.locked .wrap, body.locked #keyBar{display:none!important}
   .auth{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:20px;overflow:auto;background:rgba(12,10,31,.9);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
   .auth-card{width:100%;max-width:400px;padding:26px;border-radius:22px;display:flex;flex-direction:column;gap:12px;border:1px solid var(--line2);
@@ -257,10 +279,7 @@
     <span class="mark" aria-hidden="true">
       <svg viewBox="0 0 32 32" width="22" height="22" fill="none"><g stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M9 7v18M16 4v20M23 9v17"/></g><g fill="#fff"><rect x="6.5" y="12" width="5" height="9" rx="1.2"/><rect x="13.5" y="9" width="5" height="9" rx="1.2" opacity=".78"/><rect x="20.5" y="14" width="5" height="8" rx="1.2"/></g></svg>
     </span>
-    <div>
-      <h1>Scanner</h1>
-      <small data-i18n="sub"></small>
-    </div>
+    <h1>Scanner</h1>
   </div>
 
   <div class="tools">
@@ -298,7 +317,6 @@
   <section class="card strip" aria-label="Market session">
     <div class="strip-top">
       <div class="strip-title"><span class="live-dot" id="sessDot"></span><b id="sessLabel">—</b><span class="muted" id="sessClock"></span></div>
-      <div class="strip-note muted" id="sessNote"></div>
     </div>
     <div class="strip-track" id="sessTrack" role="img">
       <div class="strip-bar" id="sessBar"></div>
@@ -307,104 +325,74 @@
     <div class="strip-ticks" id="sessTicks"></div>
   </section>
 
-  <div class="layout">
+  <nav class="tabs">
+    <button id="tabScan" class="tab" type="button" aria-pressed="false"><span data-i18n="scanTitle"></span><span id="countBadge" class="count">0</span></button>
+    <button id="tabPicks" class="tab" type="button" aria-pressed="false"><span>⭐ <span data-i18n="picksTitle"></span></span><span id="picksBadge" class="count">0</span></button>
+  </nav>
 
-    <section class="card scan">
-      <div class="scan-head">
-        <div class="line">
-          <h2 class="card-title"><span data-i18n="scanTitle"></span> <span id="countBadge" class="count">0</span></h2>
-          <button id="btnRefresh" class="btn btn-primary" type="button" data-i18n="refresh"></button>
-        </div>
-        <div id="scanMeta" class="meta"></div>
-        <div class="filters">
-          <label class="field"><span data-i18n="fChg"></span><input id="fChg" type="number" step="0.5" value="3"></label>
-          <label class="field"><span data-i18n="fRvol"></span><input id="fRvol" type="number" step="0.1" value="2.0"></label>
-          <label class="field"><span data-i18n="fMin"></span><input id="fMin" type="number" step="0.5" value="1"></label>
-          <label class="field"><span data-i18n="fMax"></span><input id="fMax" type="number" step="1" value="50"></label>
-        </div>
-        <label class="check"><input id="rvolAdj" type="checkbox" checked><span data-i18n="rvolAdjLabel"></span></label>
-        <div class="meta" style="font-size:11.5px" data-i18n="filterHint"></div>
-        <label class="check"><input id="autoOpen" type="checkbox"><span data-i18n="autoLabel"></span></label>
-        <div class="meta" style="font-size:11.5px" data-i18n="autoNote"></div>
-      </div>
-      <div id="scanList" class="scan-list"></div>
-      <div class="scan-foot" data-i18n="scanFoot"></div>
-    </section>
-
-    <div class="stack">
-
-      <section class="card card-pad" id="picksCard">
-        <div class="picks-head">
-          <h3 class="card-title">⭐ <span data-i18n="picksTitle"></span> <span id="picksBadge" class="count">0</span></h3>
-          <div class="right">
-            <span data-i18n="picksSub"></span>
-            <button id="btnEnrich" class="btn btn-primary" type="button" data-i18n="enrichBtn"></button>
-          </div>
-        </div>
-        <div id="enrichHint" class="hint"></div>
-
-        <div class="params">
-          <label class="field"><span data-i18n="pCap"></span><input id="pCap" type="number" min="1" step="50" value="1000"></label>
-          <label class="field"><span data-i18n="pRisk"></span><input id="pRisk" type="number" min="0.1" step="0.25" value="1"></label>
-          <label class="field"><span data-i18n="pStop"></span><input id="pStop" type="number" min="0.5" step="0.5" value="3"></label>
-          <label class="field"><span data-i18n="pRR"></span><input id="pRR" type="number" min="0.5" step="0.5" value="2"></label>
-          <label class="field"><span data-i18n="pPull"></span><input id="pPull" type="number" min="0" step="0.1" value="0.5"></label>
-          <label class="field"><span data-i18n="pCost"></span><input id="pCost" type="number" min="0" step="0.1" value="0.3"></label>
-        </div>
-
-        <div id="picksList" class="picks-list"></div>
-        <div class="disclaimer" data-i18n="picksDisclaimer"></div>
-      </section>
-
-      <section class="risk" id="riskCard">
-        <div class="sel-head">
-          <div>
-            <div class="sel-id">
-              <span id="selSym" class="sel-sym">—</span>
-              <span id="selPrice" class="sel-px"></span>
-              <span id="selChg"></span>
-            </div>
-            <div id="selName" class="sel-name"></div>
-          </div>
-          <div class="sel-actions">
-            <span id="sessionBadge" class="sess-badge"></span>
-            <button id="btnCopy" class="btn" type="button" disabled data-i18n="copyBtn"></button>
-          </div>
-        </div>
-
-        <h3><i></i><span data-i18n="riskTitle"></span></h3>
-
-        <div class="info">
-          <div class="box">
-            <div class="ttl" data-i18n="liqTitle"></div>
-            <div id="liqLevel" class="big">—</div>
-            <div id="liqMeter" class="meter" data-lvl=""><i></i><i></i><i></i></div>
-            <div id="liqNote" class="note"></div>
-          </div>
-          <div class="box warn">
-            <div class="ttl" data-i18n="orderTitle"></div>
-            <div class="big" data-i18n="orderMain"></div>
-            <div class="note" data-i18n="orderDesc"></div>
-          </div>
-          <div class="box">
-            <div class="ttl" data-i18n="refTitle"></div>
-            <div class="kv"><span class="muted" data-i18n="plEntry"></span><b id="rkEntry" class="c-entry">—</b></div>
-            <div class="kv"><span class="muted" data-i18n="plStop"></span><b id="rkStop" class="c-stop">—</b></div>
-            <div class="kv"><span class="muted" data-i18n="plTarget"></span><b id="rkTarget" class="c-target">—</b></div>
-            <div class="kv"><span class="muted" data-i18n="plSize"></span><b id="rkSize" class="c-size">—</b></div>
-            <div id="rkRiskLine" class="note"></div>
-            <div class="note" style="font-size:11.5px" data-i18n="refNote"></div>
-          </div>
-        </div>
-
-        <ul class="tips">
-          <li data-i18n="tip1"></li>
-          <li data-i18n="tip2"></li>
-          <li data-i18n="tip3"></li>
-        </ul>
-      </section>
+  <section id="panelScan" class="card panel hidden">
+    <div class="panel-head">
+      <button id="btnRefresh" class="btn btn-primary" type="button" data-i18n="refresh"></button>
+      <span id="scanMeta" class="meta"></span>
     </div>
-  </div>
+    <details class="opts">
+      <summary data-i18n="settings"></summary>
+      <div class="filters">
+        <label class="field"><span data-i18n="fChg"></span><input id="fChg" type="number" step="0.5" value="3"></label>
+        <label class="field"><span data-i18n="fRvol"></span><input id="fRvol" type="number" step="0.1" value="2.0"></label>
+        <label class="field"><span data-i18n="fMin"></span><input id="fMin" type="number" step="0.5" value="1"></label>
+        <label class="field"><span data-i18n="fMax"></span><input id="fMax" type="number" step="1" value="50"></label>
+      </div>
+      <label class="check"><input id="rvolAdj" type="checkbox" checked><span data-i18n="rvolAdjLabel"></span></label>
+      <label class="check"><input id="autoOpen" type="checkbox"><span data-i18n="autoLabel"></span></label>
+    </details>
+    <div id="scanList" class="scan-list"></div>
+  </section>
+
+  <section id="panelPicks" class="card panel hidden">
+    <div class="panel-head">
+      <button id="btnEnrich" class="btn btn-primary" type="button" data-i18n="enrichBtn"></button>
+    </div>
+    <details class="opts">
+      <summary data-i18n="settings"></summary>
+      <div class="params">
+        <label class="field"><span data-i18n="pCap"></span><input id="pCap" type="number" min="1" step="50" value="1000"></label>
+        <label class="field"><span data-i18n="pRisk"></span><input id="pRisk" type="number" min="0.1" step="0.25" value="1"></label>
+        <label class="field"><span data-i18n="pStop"></span><input id="pStop" type="number" min="0.5" step="0.5" value="3"></label>
+        <label class="field"><span data-i18n="pRR"></span><input id="pRR" type="number" min="0.5" step="0.5" value="2"></label>
+        <label class="field"><span data-i18n="pPull"></span><input id="pPull" type="number" min="0" step="0.1" value="0.5"></label>
+        <label class="field"><span data-i18n="pCost"></span><input id="pCost" type="number" min="0" step="0.1" value="0.3"></label>
+      </div>
+    </details>
+    <div id="picksList" class="picks-list"></div>
+  </section>
+
+  <section class="risk hidden" id="riskCard">
+    <div class="sel-head">
+      <div>
+        <div class="sel-id">
+          <span id="selSym" class="sel-sym">—</span>
+          <span id="selPrice" class="sel-px"></span>
+          <span id="selChg"></span>
+        </div>
+        <div id="selName" class="sel-name"></div>
+      </div>
+      <div class="sel-actions">
+        <span id="sessionBadge" class="sess-badge"></span>
+        <button id="btnCopy" class="btn" type="button" disabled data-i18n="copyBtn"></button>
+      </div>
+    </div>
+    <div class="plan">
+      <div class="tile t-entry"><small data-i18n="plEntry"></small><b id="rkEntry">—</b></div>
+      <div class="tile t-stop"><small data-i18n="plStop"></small><b id="rkStop">—</b></div>
+      <div class="tile t-target"><small data-i18n="plTarget"></small><b id="rkTarget">—</b></div>
+      <div class="tile t-size"><small data-i18n="plSize"></small><b id="rkSize">—</b></div>
+    </div>
+    <div class="risk-foot">
+      <span class="liq"><b id="liqLevel">—</b><span id="liqMeter" class="meter" data-lvl=""><i></i><i></i><i></i></span></span>
+      <span class="pill pill-limit" data-i18n="orderMain"></span>
+    </div>
+  </section>
 </main>
 
 <!-- 登录 / 首次设置管理员 -->
@@ -483,7 +471,7 @@ const I18N = {
     authUser:'用户名', authPass:'密码', authRemember:'在这台设备上保持登录', authLogin:'登录',
     authErrFill:'请填写用户名和密码', authErrBad:'用户名或密码不对', authErrWait:'错误次数太多，请 {s} 秒后再试',
     authLocalNote:'账号由管理员统一发放，请向管理员索取用户名和密码。这是使用门槛，不是服务器级别的安全保护。',
-    logoutBtn:'退出 {n}',
+    logoutBtn:'退出 {n}', settings:'设置',
     scanFoot:'点击股票 → 真实模式下会按需获取该股数据（1 次请求，有缓存），评分与计划在本机计算',
     enrichBtn:'补全 Top 8 的 RVOL', enrichHint:'RVOL 需要单独获取成交量：点上方「补全」（约 8 次请求），或点击个股（1 次）。补全前评级最高为「可关注」。',
     quoteLoading:'正在获取报价与平均成交量…', quoteFail:'获取报价失败：{msg}',
@@ -574,7 +562,7 @@ const I18N = {
     authUser:'Username', authPass:'Password', authRemember:'Keep me signed in on this device', authLogin:'Sign in',
     authErrFill:'Enter a username and password', authErrBad:'Wrong username or password', authErrWait:'Too many attempts — try again in {s} s',
     authLocalNote:'Accounts are issued by the administrator — ask them for a username and password. This is an access gate, not server-grade security.',
-    logoutBtn:'Sign out {n}',
+    logoutBtn:'Sign out {n}', settings:'Settings',
     scanFoot:'Click a stock → in live mode its data is fetched on demand (1 request, cached); scoring and plan run locally',
     enrichBtn:'Fill RVOL for Top 8', enrichHint:'RVOL needs volume data fetched separately: click "Fill" above (about 8 requests) or click a stock (1). Until then the grade is capped at "Watch".',
     quoteLoading:'Fetching quote and average volume…', quoteFail:'Quote failed: {msg}',
@@ -784,25 +772,9 @@ function passFilter(r){
 function renderScan(){
   const rows = state.raw.filter(passFilter).sort((a,b)=>b.changePct-a.changePct);
   $('countBadge').textContent = rows.length;
-  const meta = $('scanMeta');
-  if(state.scanTs){
-    const mins = Math.round((Date.now()-state.scanTs)/60000);
-    const tag = state.live ? `<span class="tag-live">● ${t('tagLive')}</span>` : `<span class="tag-mock">● ${t('tagMock')}</span>`;
-    let html = t('scanMeta', {
-      tag, time: new Date(state.scanTs).toLocaleTimeString(locale()),
-      ago: mins<1 ? t('justNow') : t('minsAgo',{m:mins}), n: state.raw.length
-    });
-    const notes = [];
-    if(state.live){
-      if(state.raw.some(r => r.rvol!=null)){
-        if(state.rvolOn && state.rvolFrac<1) notes.push(t('rvolAdjMeta',{p:Math.round(state.rvolFrac*100)}) + (state.rvolFloor ? ' '+t('rvolEarlyNote') : ''));
-        else notes.push(t('rvolRawMeta'));
-      }
-      if(mins>=15 && ['pre','open','regular','after'].includes(etSession().key)) notes.push(`<span class="warn-txt">${t('staleWarn',{m:mins})}</span>`);
-    }
-    if(notes.length) html += '<br>' + notes.join('<br>');
-    meta.innerHTML = html;
-  } else meta.textContent = t('notLoaded');
+  const mins = state.scanTs ? Math.round((Date.now()-state.scanTs)/60000) : 0;
+  const stale = state.live && mins>=15 && ['pre','open','regular','after'].includes(etSession().key);
+  $('scanMeta').innerHTML = state.scanTs ? new Date(state.scanTs).toLocaleTimeString(locale(),{hour:'2-digit',minute:'2-digit'}) + (stale ? ` <span class="warn-txt">⚠ ${mins}m</span>` : '') : '';
   const list = $('scanList');
   if(!rows.length){ list.innerHTML = `<div class="empty">${state.raw.length ? t('noMatch') : t('noData')}</div>`; return; }
   list.innerHTML = rows.map(r => {
@@ -826,7 +798,7 @@ function renderScan(){
       </span>
     </button>`;
   }).join('');
-  list.querySelectorAll('.row').forEach(el => el.onclick = () => selectStock(el.dataset.sym));
+  list.querySelectorAll('.row').forEach(el => el.onclick = () => selectStock(el.dataset.sym, true));
 }
 
 /* =====================================================================
@@ -960,23 +932,20 @@ function renderPicks(){
   const ses = etSession();
   const rows = state.raw.filter(passFilter).map(s => ({ s, ...scoreStock(s, ses) })).sort((a,b)=>b.score-a.score).slice(0, TOP_N);
   $('picksBadge').textContent = rows.length;
-  $('enrichHint').textContent = state.live && rows.some(r => r.s.rvol==null) ? t('enrichHint') : '';
   $('btnEnrich').disabled = !state.live;
   const box = $('picksList');
   if(!rows.length){ box.innerHTML = `<div class="empty">${t('picksEmpty')}</div>`; return; }
   const G = { strong:{txt:t('gradeStrong'),color:'#34e0a1'}, watch:{txt:t('gradeWatch'),color:'#ffb547'}, skip:{txt:t('gradeSkip'),color:'#a09dc8'} };
   box.innerHTML = rows.map((r,i) => {
     const s = r.s, g = G[r.grade], pl = tradePlan(s), up = s.changePct>=0;
-    const chips = r.reasons.map(x => `<span class="chip" style="--cc:${TONE[x.tone]}">${esc(x.txt)}</span>`).join('');
+    const chips = r.reasons.filter(x => x.tone==='bad').map(x => `<span class="chip" style="--cc:${TONE[x.tone]}">${esc(x.txt)}</span>`).join('');
     const plan = pl.valid ? `
       <div class="plan">
         <div class="tile t-entry"><small>${t('plEntry')}</small><b>${usd(pl.entry)}</b></div>
         <div class="tile t-stop"><small>${t('plStop')}</small><b>${usd(pl.stopPx)}</b></div>
         <div class="tile t-target"><small>${t('plTarget')}</small><b>${usd(pl.target)}</b></div>
-        <div class="tile t-size"><small>${t('plSize')}</small><b>$${Math.round(pl.pos)}</b> <span class="muted">${t('plUnits',{u:fmt(pl.units,2)})}</span></div>
-      </div>
-      <p class="plan-note">${t('plRiskLine',{risk:fmt(pl.riskUsd,2), gain:fmt(pl.gainUsd,2)})} ${pl.capped?t('plCapped'):''}</p>`
-      : `<p class="plan-note">${t('plInvalid')}</p>`;
+        <div class="tile t-size"><small>${t('plSize')}</small><b>$${Math.round(pl.pos)}</b></div>
+      </div>` : '';
     return `
     <div class="pick ${state.selected?.symbol===s.symbol?'sel':''}" style="--gc:${g.color}" tabindex="0" role="button" data-sym="${esc(s.symbol)}">
       <div class="pick-head">
@@ -1074,7 +1043,7 @@ async function selectStock(sym, scroll=false){
   state.selected = stock;
   renderScan(); renderPicks(); renderSelected();
   $('btnCopy').disabled = false;
-  if(scroll && window.matchMedia('(max-width:1023px)').matches) $('riskCard').scrollIntoView({ behavior:'smooth', block:'start' });
+  if(scroll) $('riskCard').scrollIntoView({ behavior:'smooth', block:'start' });
   if(state.live && !state.noProfile && !quoteFresh(stock)){                  // 点击才请求该股数据（懒加载）
     $('selName').textContent = t('quoteLoading');
     try{ await enrichOne(stock); }
@@ -1092,7 +1061,6 @@ function renderStrip(){
   $('sessLabel').textContent = s.label;
   $('sessClock').textContent = `${t('stripTitle')} ${hh}:${mm}`;
   $('sessDot').style.setProperty('--dot', s.color);
-  $('sessNote').textContent = s.key==='regular' ? t('stripTight') : s.key==='closed' ? t('stripClosed') : t('stripWide');
   const fmtT = m => `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`;
   const ticks = [[240,0],[570,(570-start)/total*100],[s.closeMin,(s.closeMin-start)/total*100],[afterEnd,100]];
   $('sessTicks').innerHTML = ticks.map(([m,p]) => `<span style="left:${p}%">${fmtT(m)}</span>`).join('');
@@ -1116,30 +1084,19 @@ function renderSession(){
 
 function renderSelected(){
   const s = state.selected, ses = renderSession();
-  if(!s){
-    $('selSym').textContent = '—'; $('selPrice').textContent = ''; $('selChg').textContent = '';
-    $('selName').textContent = t('selectHint');
-    ['liqLevel','rkEntry','rkStop','rkTarget','rkSize'].forEach(id => { $(id).textContent = '—'; });
-    $('liqLevel').style.color = ''; $('liqNote').textContent = ''; $('rkRiskLine').textContent = ''; $('liqMeter').dataset.lvl = '';
-    $('btnCopy').disabled = true;
-    return;
-  }
+  $('riskCard').classList.toggle('hidden', !s);
+  if(!s){ $('btnCopy').disabled = true; return; }
   $('selSym').textContent = s.symbol;
   $('selPrice').textContent = '$'+fmt(s.price);
   $('selChg').innerHTML = `<span class="pill ${s.changePct>=0?'pill-up':'pill-down'}" style="font-size:13px">${s.changePct>=0?'+':''}${fmt(s.changePct)}%</span>`;
   $('selName').textContent = s.name + (s.rvol!=null ? ` · RVOL ${fmt(s.rvol,1)}x` : '');
   const est = liquidityEstimate(s, ses);
   $('liqLevel').textContent = est.lv; $('liqLevel').style.color = est.color; $('liqMeter').dataset.lvl = est.lvl;
-  $('liqNote').textContent = est.note + (isOffHours(ses) ? t('offHours') : '');
   const pl = tradePlan(s);
   if(pl.valid){
     $('rkEntry').textContent = usd(pl.entry); $('rkStop').textContent = usd(pl.stopPx); $('rkTarget').textContent = usd(pl.target);
-    $('rkSize').textContent = `$${Math.round(pl.pos)} (${t('plUnits',{u:fmt(pl.units,2)})})`;
-    $('rkRiskLine').textContent = t('plRiskLine',{risk:fmt(pl.riskUsd,2), gain:fmt(pl.gainUsd,2)}) + (pl.capped ? ' ' + t('plCapped') : '');
-  } else {
-    ['rkEntry','rkStop','rkTarget','rkSize'].forEach(id => { $(id).textContent = '—'; });
-    $('rkRiskLine').textContent = t('plInvalid');
-  }
+    $('rkSize').textContent = `$${Math.round(pl.pos)}`;
+  } else ['rkEntry','rkStop','rkTarget','rkSize'].forEach(id => { $(id).textContent = '—'; });
 }
 
 /* ---------------------------- 复制 Ticker ---------------------------- */
@@ -1192,6 +1149,13 @@ function setLang(l){
 $('langSel').onchange = e => setLang(e.target.value);
 $('modeSwitch').onclick = () => setMode(!state.live);
 $('modeSwitch').onkeydown = e => { if(e.key==='Enter' || e.key===' '){ e.preventDefault(); setMode(!state.live); } };
+const PANELS = { scan:['tabScan','panelScan'], picks:['tabPicks','panelPicks'] };
+function togglePanel(k){
+  const [tab, panel] = PANELS[k], open = $(panel).classList.contains('hidden');
+  $(panel).classList.toggle('hidden', !open); $(tab).setAttribute('aria-pressed', open ? 'true' : 'false');
+}
+$('tabScan').onclick = () => togglePanel('scan');
+$('tabPicks').onclick = () => togglePanel('picks');
 $('btnRefresh').onclick = () => refreshScan();
 $('btnCopy').onclick = () => copySym(state.selected?.symbol);
 $('btnEnrich').onclick = () => enrichTop();
