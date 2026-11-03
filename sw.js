@@ -1,6 +1,6 @@
-// DayScan service worker: cache-first for the app shell, never caches FMP API calls.
+// Scanner service worker: cache-first for the app shell, never caches FMP API calls.
 // Bump VERSION on every release so phones pick up the new files.
-const VERSION = 'dayscan-v8';
+const VERSION = 'scanner-v9';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

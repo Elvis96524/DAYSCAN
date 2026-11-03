@@ -1,6 +1,6 @@
 {
-  "name": "DayScan 美股日内交易扫描器",
-  "short_name": "DayScan",
+  "name": "Scanner 美股日内交易扫描器",
+  "short_name": "Scanner",
   "description": "US day-trading scanner with FMP data and eToro risk hints",
   "start_url": "./index.html",
   "scope": "./",
