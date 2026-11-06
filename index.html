@@ -720,6 +720,11 @@ const MOCK_SCAN = [
  * ===================================================================== */
 const num = v => (v==null||v==='') ? null : Number(v);
 
+/* 只看公司股：剔除 ETF / ETN / 基金 / 杠杆与反向产品（先按名称和交易所判断，补全资料后再用 profile 的 isEtf / isFund 确认） */
+const FUND_RE = /\bETFs?\b|\bETN\b|\bETP\b|\bFunds?\b|ProShares|ProFunds|Direxion|iShares|Invesco(?! Ltd)|SPDR|VanEck|GraniteShares|Tradr|Defiance|YieldMax|Roundhill|Leverage Shares|T-Rex|Teucrium|Global X|First Trust|Rydex|MicroSectors|Grayscale|Bitwise|Simplify|\b[1-4]X\b|Ultra(?:Pro|Short)|Ultra (?:S&P|QQQ|Nasdaq|Russell|Bloomberg|Silver|Gold)|\bInverse\b|\bLeveraged\b|\bDaily\b.*(?:Bull|Bear|Short|Long|Target|S&P|Nasdaq|Russell)|S&P ?500|Nasdaq-?100|Russell ?[123]000|Volatility|\bVIX\b|(?:Gold|Silver|Bitcoin|Ethereum|Ether|Oil|Currency|Platinum|Palladium|Uranium) Trust|Trust.*(?:Bitcoin|Ether)/i;
+const FUND_EXCH_RE = /ARCA|BATS|CBOE/i;
+const isFundLike = r => !!(r.isFund || FUND_RE.test(r.name||'') || FUND_EXCH_RE.test(r.exchange||''));
+
 async function loadScanLive(){
   const warns = [];
   // 请求1+2：涨幅榜（核心）+ 最活跃榜（失败不影响主流程）。
@@ -731,10 +736,10 @@ async function loadScanLive(){
   const map = new Map();
   list.forEach(r => {
     const sym = r.symbol; if(!sym || map.has(sym)) return;
-    map.set(sym, { symbol:sym, name:r.name||'', price:num(r.price), changePct:num(r.changesPercentage ?? r.changePercentage ?? r.changePercent), volume:null, avgVolume:null });
+    map.set(sym, { symbol:sym, name:r.name||'', exchange:r.exchange||r.exchangeShortName||'', price:num(r.price), changePct:num(r.changesPercentage ?? r.changePercentage ?? r.changePercent), volume:null, avgVolume:null });
   });
   const fMin=+$('fMin').value, fMax=+$('fMax').value, fChg=+$('fChg').value;
-  const cands = [...map.values()].filter(r => Number.isFinite(r.price) && Number.isFinite(r.changePct) && r.price>=fMin && r.price<=fMax && r.changePct>fChg).slice(0,60);
+  const cands = [...map.values()].filter(r => Number.isFinite(r.price) && Number.isFinite(r.changePct) && r.price>=fMin && r.price<=fMax && r.changePct>fChg && !isFundLike(r)).slice(0,60);
   return { rows:cands, warns };
 }
 
@@ -766,7 +771,7 @@ async function refreshScan(auto=false){
 /* ---------------------------- 筛选 + 左侧列表 ---------------------------- */
 function passFilter(r){
   const fChg=+$('fChg').value, fRvol=+$('fRvol').value, fMin=+$('fMin').value, fMax=+$('fMax').value;
-  return r.price>=fMin && r.price<=fMax && r.changePct>fChg && (r.rvol==null || r.rvol>fRvol);
+  return !isFundLike(r) && r.price>=fMin && r.price<=fMax && r.changePct>fChg && (r.rvol==null || r.rvol>fRvol);
 }
 function renderScan(){
   const ses = etSession();
@@ -999,7 +1004,7 @@ async function enrichOne(stock){
     }
     const raw = Array.isArray(r) ? r[0] : r;
     if(!raw) throw new Error('empty profile');
-    pf = { price:raw.price, changePercentage:raw.changePercentage ?? raw.changesPercentage, volume:raw.volume, averageVolume:raw.averageVolume ?? raw.avgVolume, marketCap:raw.marketCap };
+    pf = { price:raw.price, changePercentage:raw.changePercentage ?? raw.changesPercentage, volume:raw.volume, averageVolume:raw.averageVolume ?? raw.avgVolume, marketCap:raw.marketCap, isEtf:raw.isEtf, isFund:raw.isFund };
     fetchedAt = Date.now(); lsSet(pk, { ts:fetchedAt, d:pf });
   }
   state.failStreak = 0;
@@ -1007,6 +1012,7 @@ async function enrichOne(stock){
   const chg = num(pf.changePercentage); if(Number.isFinite(chg)) stock.changePct = chg;
   stock.volume = num(pf.volume);
   stock.marketCap = num(pf.marketCap);
+  stock.isFund = pf.isEtf === true || pf.isFund === true;
   const avg = num(pf.averageVolume);
   if(avg>0) stock.avgVolume = avg;
   stock.dataTs = fetchedAt; stock.fetchedAt = fetchedAt;                   // profile 没有时间戳，按抓取时刻折算
