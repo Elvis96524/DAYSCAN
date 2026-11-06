@@ -743,12 +743,22 @@ async function loadScanLive(){
   return { rows:cands, warns };
 }
 
+/* 「正在上升」：和上一次刷新时的价格比较（只有快照，没有分时走势）。
+ * 30 分钟内的上一次快照才有效；快照不足 60 秒不更新，避免连点两次刷新时价格相同被当成「没涨」。 */
+function applyTrend(rows){
+  const now = Date.now(), prev = lsGet('dt_prev', null);
+  const base = prev && now - prev.ts < 30*60e3 ? prev : null;
+  rows.forEach(r => { const q = base ? base.p[r.symbol] : null; r.trendPct = q>0 ? (r.price-q)/q*100 : null; });
+  if(!base || now - base.ts >= 60e3) lsSet('dt_prev', { ts:now, p:Object.fromEntries(rows.map(r => [r.symbol, r.price])) });
+}
+
 async function refreshScan(auto=false){
   const btn = $('btnRefresh'); btn.disabled = true; btn.textContent = t('loading');
   try{
     if(state.live){
       const res = await loadScanLive();
       state.raw = res.rows;
+      applyTrend(state.raw);
       state.scanTs = Date.now();
       lsSet(LS.scan, { ts:state.scanTs, rows:state.raw });
       const warns = res.warns.slice();
@@ -771,7 +781,7 @@ async function refreshScan(auto=false){
 /* ---------------------------- 筛选 + 左侧列表 ---------------------------- */
 function passFilter(r){
   const fChg=+$('fChg').value, fRvol=+$('fRvol').value, fMin=+$('fMin').value, fMax=+$('fMax').value;
-  return !isFundLike(r) && r.price>=fMin && r.price<=fMax && r.changePct>fChg && (r.rvol==null || r.rvol>fRvol);
+  return !isFundLike(r) && (r.trendPct==null || r.trendPct>0) && r.price>=fMin && r.price<=fMax && r.changePct>fChg && (r.rvol==null || r.rvol>fRvol);
 }
 function renderScan(){
   const ses = etSession();
@@ -794,6 +804,7 @@ function renderScan(){
         <span class="nm muted">${esc(r.name)}</span>
         <span class="row-chips">
           <span class="pill ${rvCls}" title="${r.rvolRaw!=null ? 'raw '+fmt(r.rvolRaw,2)+'×' : ''}">RVOL ${rvTxt}</span>
+          ${r.trendPct>0 ? `<span class="pill pill-up">▲ ${fmt(r.trendPct,1)}%</span>` : ''}
           <span class="muted">Vol ${fmtVol(r.volume)}</span>
         </span>
       </span>
