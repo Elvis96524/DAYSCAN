@@ -742,7 +742,6 @@ async function refreshScan(auto=false){
   const btn = $('btnRefresh'); btn.disabled = true; btn.textContent = t('loading');
   try{
     if(state.live){
-      if(!auto && !confirm(t('confirmRefresh',{used:quota().used, limit:DAILY_LIMIT}))) return;
       const res = await loadScanLive();
       state.raw = res.rows;
       state.scanTs = Date.now();
@@ -770,7 +769,8 @@ function passFilter(r){
   return r.price>=fMin && r.price<=fMax && r.changePct>fChg && (r.rvol==null || r.rvol>fRvol);
 }
 function renderScan(){
-  const rows = state.raw.filter(passFilter).sort((a,b)=>b.changePct-a.changePct);
+  const ses = etSession();
+  const rows = state.raw.filter(passFilter).map(r => ({ r, sc: scoreStock(r, ses).score })).sort((a,b) => b.sc-a.sc || b.r.changePct-a.r.changePct).map(x => x.r);
   $('countBadge').textContent = rows.length;
   const mins = state.scanTs ? Math.round((Date.now()-state.scanTs)/60000) : 0;
   const stale = state.live && mins>=15 && ['pre','open','regular','after'].includes(etSession().key);
@@ -930,7 +930,7 @@ const TONE = { good:'#34e0a1', warn:'#ffb547', bad:'#ff6b7a', neutral:'#a09dc8' 
 
 function renderPicks(){
   const ses = etSession();
-  const rows = state.raw.filter(passFilter).map(s => ({ s, ...scoreStock(s, ses) })).sort((a,b)=>b.score-a.score).slice(0, TOP_N);
+  const rows = state.raw.filter(passFilter).map(s => ({ s, ...scoreStock(s, ses) })).sort((a,b)=>b.score-a.score || b.s.changePct-a.s.changePct).slice(0, TOP_N);
   $('picksBadge').textContent = rows.length;
   $('btnEnrich').disabled = !state.live;
   const box = $('picksList');
@@ -1022,7 +1022,6 @@ async function enrichTop(auto=false){
   const top = state.raw.filter(passFilter).map(s => ({ s, ...scoreStock(s, ses) })).sort((a,b)=>b.score-a.score).slice(0, ENRICH_N).map(x=>x.s);
   const need = top.filter(r => !quoteFresh(r));
   if(!need.length){ toast(t('enrichNone')); return; }
-  if(!auto && !confirm(t('confirmEnrich',{ n:need.length, req:need.length, used:quota().used, limit:DAILY_LIMIT }))) return;
   const btn = $('btnEnrich'); btn.disabled = true; btn.textContent = t('loading');
   let done = 0, failed = 0;
   try{
@@ -1156,7 +1155,13 @@ function togglePanel(k){
 }
 $('tabScan').onclick = () => togglePanel('scan');
 $('tabPicks').onclick = () => togglePanel('picks');
-$('btnRefresh').onclick = () => refreshScan();
+/* 一次点击：取涨幅榜，再补全前 8 只的 RVOL（直接请求，不再弹确认；剩余额度不足 15 次时只取榜单） */
+async function fetchAll(){
+  const before = state.scanTs;
+  await refreshScan(true);
+  if(state.live && state.scanTs !== before && !state.noProfile && DAILY_LIMIT - quota().used >= 15) await enrichTop(true);
+}
+$('btnRefresh').onclick = () => fetchAll();
 $('btnCopy').onclick = () => copySym(state.selected?.symbol);
 $('btnEnrich').onclick = () => enrichTop();
 ['fChg','fRvol','fMin','fMax'].forEach(id => $(id).addEventListener('input', () => { renderScan(); renderPicks(); }));
